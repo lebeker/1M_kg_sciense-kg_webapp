@@ -1,0 +1,35 @@
+{
+  "name": "kg-viewer",
+  "private": true,
+  "version": "0.0.2",
+  "type": "module",
+  "description": "Single-file React viewer for a kg/1 knowledge-graph document.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:local": "vite build",
+    "build:multi": "KG_BUILD=multi vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "bundle": "node scripts/bundle.mjs",
+    "release": "node scripts/release.mjs"
+  },
+  "dependencies": {
+    "3d-force-graph": "^1.80.1",
+    "graphology": "^0.26.0",
+    "graphology-layout": "^0.6.1",
+    "graphology-layout-forceatlas2": "^0.10.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "sigma": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.4",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}

@@ -1,0 +1,221 @@
+:root {
+  --bg: #14161a;
+  --fg: #e6e8ec;
+  --muted: #8b93a1;
+  --line: #2a2e36;
+  --panel: #1b1e24;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.45 ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+.app {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  border-bottom: 1px solid var(--line);
+  z-index: 3;
+}
+
+.title {
+  font-weight: 600;
+}
+
+.count,
+.hits i,
+.legend i {
+  color: var(--muted);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.search {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 5px 8px;
+  width: 220px;
+}
+
+button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.switch {
+  display: flex;
+  gap: 2px;
+}
+
+.switch button.on {
+  background: #2c3444;
+  border-color: #46536c;
+}
+
+/* the renderers fill whatever is left; the panel and legend float above them */
+.view {
+  position: absolute;
+  top: 44px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.canvas canvas {
+  display: block;
+}
+
+.empty {
+  color: var(--muted);
+  padding: 16px;
+}
+
+.hits {
+  position: absolute;
+  top: 48px;
+  left: 320px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-width: 280px;
+  z-index: 4;
+}
+
+.hits li {
+  padding: 5px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.hits li:hover {
+  background: #242833;
+}
+
+.legend {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  margin: 0;
+  padding: 8px 10px;
+  list-style: none;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.panel {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  padding: 16px;
+  overflow-y: auto;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  z-index: 5;
+}
+
+.panel h2 {
+  margin: 0 24px 12px 0;
+  font-size: 15px;
+}
+
+.panel dl {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 2px 8px;
+  margin: 0 0 12px;
+}
+
+.panel dt {
+  color: var(--muted);
+}
+
+.panel dd {
+  margin: 0;
+}
+
+.panel a {
+  color: #6ea8fe;
+  word-break: break-all;
+}
+
+.tags {
+  color: var(--muted);
+}
+
+.id {
+  display: block;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  padding: 0 8px;
+  font-size: 18px;
+  line-height: 1.4;
+}
