@@ -1,0 +1,43 @@
+{
+  "id": "viewer",
+  "title": "Research field map",
+  "purpose": "Map a research field so it can be looked at: what the field is made of, who works on it, and where the applied work is.",
+  "keywords": [
+    "research", "field", "map", "paper", "papers", "literature", "science",
+    "scientific", "researcher", "researchers", "scientist", "scientists",
+    "who works on", "lab", "labs", "university", "institution", "company",
+    "companies", "startup", "graph", "knowledge graph", "literature review",
+    "longevity", "biotech", "cryogenics", "brain", "drug", "clinical", "trial"
+  ],
+  "requires": {
+    "skills": ["kg"],
+    "plugins": [],
+    "tools": ["openalex"]
+  },
+  "recommends": {
+    "tools": ["a web-search tool", "crossref", "arxiv"]
+  },
+  "tool_notes": {
+    "openalex": "works, authors, institutions and concepts in one place, free and without a key — it carries most of the skeleton",
+    "crossref": "publisher metadata, DOIs and funders, for what OpenAlex has not indexed",
+    "arxiv": "preprints, which appear here months before anywhere else",
+    "a web-search tool": "the only way to evidence a company — no free API lists what a private company is working on"
+  },
+  "kinds": [
+    { "kind": "concept", "color": "#7b9ecb", "meaning": "a subject, question or mechanism the field is about" },
+    { "kind": "scientist", "color": "#d47fa6", "meaning": "a researcher" },
+    { "kind": "lab", "color": "#93c47d", "meaning": "a working group, usually inside an institution" },
+    { "kind": "institution", "color": "#9aa0a6", "meaning": "a university, hospital or public body" },
+    { "kind": "company", "color": "#f5a623", "meaning": "a company, and what it is building" }
+  ],
+  "edges": [
+    { "pattern": "scientist → concept", "label": "the title of the work", "meaning": "a piece of work is an EDGE, not a node: from the researcher to the subject, label the title, --time the year, --dir in" },
+    { "pattern": "scientist → institution", "label": "works at", "meaning": "affiliation" },
+    { "pattern": "institution → concept", "label": "research on", "meaning": "a body's stated interest" },
+    { "pattern": "company → concept", "label": "targets", "meaning": "what a company's work addresses, --dir in" },
+    { "pattern": "company → company", "label": "collaborates on <subject>", "meaning": "two organisations on the same subject — this is what makes a cluster legible instead of a fan of lines into one dot" }
+  ],
+  "layout": {
+    "note": "Companies and institutions at the centre, researchers in the middle, subjects on the periphery. With authored x,y the viewer uses them as given; without them it lays the graph out itself."
+  }
+}

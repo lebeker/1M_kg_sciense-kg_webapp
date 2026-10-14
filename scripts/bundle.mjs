@@ -35,6 +35,14 @@ const assets = join(dest, 'assets')
 mkdirSync(assets, { recursive: true })
 copyFileSync(built, join(assets, 'viewer.html'))
 
+// The app's own declaration travels with it. This is the file that says what the app is
+// for, what it needs in order to be useful, and which node kinds and edges a graph for it
+// should be made of — so a skill can match a user's ask to an app, and then build the
+// graph to the app's conventions instead of inventing its own.
+const manifest = join(root, 'app.json')
+if (existsSync(manifest)) copyFileSync(manifest, join(assets, 'viewer.app.json'))
+else console.warn('app.json is missing — the skill will fall back to its own catalogue')
+
 // Record where this viewer came from. The skill ships no viewer of its own, so the copy
 // in `assets/` has to be able to say which app it is, which build, and where to fetch a
 // newer one — `kg.py apps` reads this sidecar and prints it.
@@ -57,11 +65,16 @@ const stamp = {
   commit: git(['rev-parse', '--short', 'HEAD']),
   bytes: statSync(built).size,
   // Where a graph can get this viewer from without building anything. `kg.py new` copies
-  // this into `meta.app_url`, so a graph carries the way to render itself.
+  // this into `meta.app_url`, so a graph carries the way to render itself. The declaration
+  // (`app.json`) is deliberately not tag-pinned: it says what the app is for, which does
+  // not change when the build does, and it stays readable at `main`.
   fetch_url: `https://raw.githubusercontent.com/${origin.replace('https://github.com/', '')}` +
     `/viewer-v${pkg.version}/viewer.html`,
+  manifest_url: `https://raw.githubusercontent.com/${origin.replace('https://github.com/', '')}` +
+    `/main/app.json`,
 }
 writeFileSync(join(assets, 'viewer.version'), JSON.stringify(stamp, null, 2) + '\n')
 
 console.log(`viewer.html (${stamp.bytes} bytes) -> ${join(assets, 'viewer.html')}`)
+console.log(`viewer.app.json -> ${join(assets, 'viewer.app.json')}`)
 console.log(`  ${stamp.name} ${stamp.version} ${stamp.commit} from ${origin || '(no origin remote)'}`)

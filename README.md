@@ -73,6 +73,27 @@ produces the final page replaces the element's text with the `kg/1` JSON and
 changes nothing else. Opening the file with the placeholder still in place shows
 an empty graph and logs no errors.
 
+## The app's declaration — `app.json`
+
+This repository ships two things, not one. The second is `app.json`: what this app **is for**,
+what it **needs** in order to be useful, and the node kinds and edge patterns a graph for it
+is made of.
+
+It is what turns "make me a graph" into a specific thing to build. A skill reads it to:
+
+- match a user's words to this app rather than to whatever is first in a list,
+- tell the user what has to be installed first — and **why** (`tool_notes`: OpenAlex carries
+  works, authors, institutions and concepts; a web search is the only way to evidence a
+  company; nothing else lists what a private company is working on),
+- build the graph to this app's conventions: `kinds` seed the palette, `edges` are the
+  patterns that make a map of this kind legible. A piece of work is an **edge** between the
+  researcher and the subject, not a node with a line to something.
+
+Edit it here, in this repo — the app owns the definition of its own goal. It is published at
+`…/main/app.json` (not tag-pinned: what the app is *for* does not change when the build
+does), and picked up by `fetch-app`, or copied in by `bundle.mjs` as
+`assets/viewer.app.json`.
+
 ## Landing it in a skill
 
 ```bash
@@ -80,9 +101,21 @@ bun run build
 node scripts/bundle.mjs /path/to/skill-repo
 ```
 
-Copies `dist/index.html` to `<skill-repo>/assets/viewer.html` and writes
-`assets/viewer.version`. The file is **copied, not symlinked**: a skill repo has
-to work from a clone, on its own, with no build step and no reference back here.
+Copies `dist/index.html` to `<skill-repo>/assets/viewer.html`, `app.json` to
+`assets/viewer.app.json`, and writes `assets/viewer.version` (repo, commit, build time, where
+to fetch a newer one). The files are **copied, not symlinked**: a skill repo has to work from
+a clone, on its own, with no build step and no reference back here.
+
+## Publishing a new build
+
+```bash
+bun run build:local && bun run release
+```
+
+`release` writes the artifact to a `dist` branch (git plumbing, never a checked-out orphan
+branch) and tags it `viewer-v<version>`: an immutable URL, one `curl`, no node and no bun for
+whoever wants the viewer. A fix gets a new version — the old tag keeps serving exactly what
+it served. With `gh` authenticated it also attaches the file to a GitHub Release.
 
 ## Using the same bundle as an MCP-App
 

@@ -32,6 +32,8 @@ const fail = (msg) => {
 }
 
 if (!existsSync(built)) fail('dist/index.html is missing — run `bun run build:local` first')
+const manifest = join(root, 'app.json')
+if (!existsSync(manifest)) fail('app.json is missing — it is the app\'s own declaration')
 
 const git = (args, opts = {}) =>
   execFileSync('git', args, { cwd: root, encoding: 'utf8', ...opts }).trim()
@@ -71,6 +73,9 @@ const env = { ...process.env, GIT_INDEX_FILE: index }
 const blobFor = (file) => git(['hash-object', '-w', file], { env })
 git(['update-index', '--add', '--cacheinfo', `100644,${blobFor(built)},viewer.html`], { env })
 git(['update-index', '--add', '--cacheinfo', `100644,${blobFor(stampFile)},viewer.version`], { env })
+// The declaration is published beside the artifact, so `kg.py fetch-app` can install the
+// viewer and what-it-needs in one step.
+git(['update-index', '--add', '--cacheinfo', `100644,${blobFor(manifest)},app.json`], { env })
 const tree = git(['write-tree'], { env })
 rmSync(index, { force: true })
 
@@ -91,7 +96,7 @@ git(['update-ref', 'refs/heads/dist', commit])
 git(['tag', '-f', tag, commit])
 rmSync(stampFile, { force: true })
 
-console.log(`dist branch -> ${commit.slice(0, 7)}  (viewer.html, viewer.version)`)
+console.log(`dist branch -> ${commit.slice(0, 7)}  (viewer.html, viewer.version, app.json)`)
 console.log(`tag         -> ${tag}  (built from ${sourceSha})`)
 
 const push = (what) => {
@@ -101,7 +106,7 @@ const push = (what) => {
 push('dist')
 push(tag)
 const raw = `https://raw.githubusercontent.com/${slug}/${tag}/viewer.html`
-console.log(`\npublished:\n  ${raw}`)
+console.log(`\npublished:\n  ${raw}\n  https://raw.githubusercontent.com/${slug}/${tag}/app.json`)
 
 // --- the release, if gh can do it -----------------------------------------
 const authed = spawnSync('gh', ['auth', 'status'], { encoding: 'utf8' }).status === 0
