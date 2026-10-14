@@ -33,11 +33,15 @@ export default function SigmaView({ kg, selected, onSelect, fitSignal }: Props) 
     const el = host.current
     if (!el) return
     // A five-node graph should show its five labels; a thousand-node one cannot. The
-    // threshold is a property of the graph, not a taste, so it is derived from it.
-    const small = kg.graph.order <= 50
+    // threshold is a property of the graph, not a taste, so it is derived from it: up to
+    // about a hundred nodes every label fits and every label is the point; past that,
+    // weight decides which ones earn the space.
+    const small = kg.graph.order <= 100
     const instance = new Sigma(kg.graph, el, {
       renderEdgeLabels: false,
-      defaultEdgeColor: '#2b3038',
+      // #2b3038 on a #14161a page is 1.1:1 — the relations were there but unreadable. A
+      // field map whose lines cannot be seen is a scatter of dots.
+      defaultEdgeColor: '#525c6b',
       labelColor: { color: '#c7ccd6' },
       labelSize: 12,
       labelRenderedSizeThreshold: small ? 0 : 7,
