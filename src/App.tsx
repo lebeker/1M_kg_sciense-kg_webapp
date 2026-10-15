@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { type Kg, kindsOf, loadKg } from './kg'
 import SigmaView from './SigmaView'
 import './styles.css'
@@ -7,6 +7,36 @@ import './styles.css'
 const ThreeView = lazy(() => import('./ThreeView'))
 
 type Hit = { id: string; label: string; kind: string }
+
+/** The rows the panel lays out in its own order. Everything else a node carries is data. */
+const LAID_OUT = new Set([
+  'id', 'label', 'kind', 'level', 'size', 'parent', 'tags', 'link', 'desc', 'color',
+  'style', 'x', 'y',
+])
+
+const DOI = /^10\.\d{4,9}\/\S+$/
+const URLISH = /^https?:\/\/\S+$/
+
+/** A value as a cell: identifiers and URLs resolve, lists join, everything else is text. */
+function renderValue(v: unknown) {
+  if (Array.isArray(v)) return v.join(' · ')
+  const s = String(v)
+  if (DOI.test(s)) {
+    return (
+      <a className="doi" href={`https://doi.org/${s}`} target="_blank" rel="noreferrer">
+        {s}
+      </a>
+    )
+  }
+  if (URLISH.test(s)) {
+    return (
+      <a href={s} target="_blank" rel="noreferrer">
+        {s}
+      </a>
+    )
+  }
+  return s
+}
 
 export default function App() {
   const [kg, setKg] = useState<Kg | null>(null)
@@ -40,6 +70,15 @@ export default function App() {
     if (!kg || !selected || !kg.graph.hasNode(selected)) return null
     return kg.graph.getNodeAttributes(selected) as Record<string, unknown>
   }, [kg, selected])
+
+  // What the panel does not lay out itself, in a stable order — derived from the node, so a
+  // graph carrying a field this app has never heard of still shows it.
+  const extraFields = useMemo<[string, unknown][]>(() => {
+    if (!nodeAttrs) return []
+    return Object.entries(nodeAttrs)
+      .filter(([k, v]) => !LAID_OUT.has(k) && v != null && String(v).length > 0)
+      .sort(([a], [b]) => a.localeCompare(b))
+  }, [nodeAttrs])
 
   if (!kg) return <div className="app" />
 
@@ -125,8 +164,19 @@ export default function App() {
             <dd>{nodeAttrs.kind != null ? String(nodeAttrs.kind) : '—'}</dd>
             <dt>level</dt>
             <dd>{nodeAttrs.level != null ? String(nodeAttrs.level) : '—'}</dd>
+            <dt>size</dt>
+            <dd>{nodeAttrs.size != null ? String(nodeAttrs.size) : '—'}</dd>
             <dt>parent</dt>
             <dd>{nodeAttrs.parent != null ? String(nodeAttrs.parent) : '—'}</dd>
+            {/* Every other property the document carried gets its own row. This panel has no
+                list of fields and never needs one: the graph says what it has, and adding a
+                property to a node is a data edit, not a change to this app. */}
+            {extraFields.map(([k, v]) => (
+              <Fragment key={k}>
+                <dt>{k}</dt>
+                <dd>{renderValue(v)}</dd>
+              </Fragment>
+            ))}
           </dl>
           {Array.isArray(nodeAttrs.tags) && nodeAttrs.tags.length > 0 ? (
             <p className="tags">{nodeAttrs.tags.join(' · ')}</p>

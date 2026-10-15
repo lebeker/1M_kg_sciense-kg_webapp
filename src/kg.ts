@@ -32,6 +32,13 @@ export type KgNode = {
   x?: number
   y?: number
   parent?: string
+  /**
+   * Every other key is a property in its own right: carried through untouched, and the panel
+   * gives it its own row. That is the contract — a graph can gain a field without this app
+   * changing. `doi` (bare, `10.1126/science.abn9257`) is the canonical case: an identifier,
+   * not prose, so it is never buried in `desc`.
+   */
+  [key: string]: unknown
 }
 
 export type KgEdge = {
@@ -42,6 +49,7 @@ export type KgEdge = {
   /** When the edge is a piece of work (a paper, a trial), its date. */
   time?: string | number
   link?: string
+  [key: string]: unknown
 }
 
 export type KgJson = { meta?: KgMeta; nodes: KgNode[]; edges: KgEdge[] }
@@ -110,6 +118,17 @@ export function ensurePositions(kg: Kg): 'authored' | 'computed' {
   return 'computed'
 }
 
+/**
+ * The node keys this reader handles explicitly. Anything else in the document is passed
+ * through as it is — the app must not have an opinion about what a graph can carry.
+ */
+const RESERVED_NODE_KEYS = new Set([
+  'id', 'label', 'kind', 'level', 'size', 'style', 'desc', 'link', 'color', 'tags',
+  'x', 'y', 'parent',
+])
+
+const RESERVED_EDGE_KEYS = new Set(['from', 'to'])
+
 /** kg/1 JSON -> the single graphology graph. */
 export function toKg(doc: KgJson): Kg {
   const meta = doc.meta ?? {}
@@ -134,6 +153,15 @@ export function toKg(doc: KgJson): Kg {
     if (y !== undefined) attrs.y = y
     if (size !== undefined) attrs.size = size
     if (level !== undefined) attrs.level = level
+
+    // Everything else the document carries is still a property of this node, so it is copied
+    // as it is. Enumerating fields here is what used to force a change in this app every time
+    // a graph gained one: a graph is data, and its reader must not impose a schema on it.
+    for (const [k, v] of Object.entries(n as Record<string, unknown>)) {
+      if (RESERVED_NODE_KEYS.has(k) || v === undefined || v === null) continue
+      if (typeof v === 'object' && !Array.isArray(v)) continue
+      attrs[k] = v
+    }
     graph.addNode(n.id, attrs)
   }
 
@@ -155,6 +183,13 @@ export function toKg(doc: KgJson): Kg {
     const label = str(e.label), dir = str(e.dir)
     if (label !== undefined) attrs.label = label
     if (dir !== undefined) attrs.dir = dir
+    // Same rule as nodes: an edge property the document carries is kept, not dropped because
+    // this file did not know about it. `weight` on a co-citation edge is the common case.
+    for (const [k, v] of Object.entries(e as Record<string, unknown>)) {
+      if (RESERVED_EDGE_KEYS.has(k) || v === undefined || v === null) continue
+      if (typeof v === 'object' && !Array.isArray(v)) continue
+      attrs[k] = v
+    }
     try {
       graph.addEdgeWithKey(`e${i++}`, e.from, e.to, attrs)
     } catch {
