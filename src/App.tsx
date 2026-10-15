@@ -8,6 +8,9 @@ const ThreeView = lazy(() => import('./ThreeView'))
 
 type Hit = { id: string; label: string; kind: string }
 
+/** The width `.panel` covers on the right (styles.css), so the renderer can fit beside it. */
+const PANEL_PX = 341
+
 /** The rows the panel lays out in its own order. Everything else a node carries is data. */
 const LAID_OUT = new Set([
   'id', 'label', 'kind', 'level', 'size', 'parent', 'tags', 'link', 'desc', 'color',
@@ -88,7 +91,11 @@ export default function App() {
         <span className="title">{kg.meta.title ?? 'knowledge graph'}</span>
         <span className="count">
           {kg.graph.order} nodes · {kg.graph.size} edges
-          {kg.layout === 'computed' ? ' · layout computed here' : ''}
+          {kg.layout === 'computed'
+            ? ' · layout computed here'
+            : kg.layout === 'rings'
+              ? ' · arranged by ring'
+              : ''}
         </span>
 
         <input
@@ -134,10 +141,11 @@ export default function App() {
         {kg.graph.order === 0 ? (
           <p className="empty">no graph in this page</p>
         ) : mode === '2d' ? (
-          <SigmaView kg={kg} selected={selected} onSelect={onSelect} fitSignal={fit} />
+          <SigmaView kg={kg} selected={selected} onSelect={onSelect} fitSignal={fit}
+                     insetRight={selected ? PANEL_PX : 0} />
         ) : (
           <Suspense fallback={<p className="empty">loading 3D…</p>}>
-            <ThreeView kg={kg} onSelect={onSelect} />
+            <ThreeView kg={kg} onSelect={onSelect} insetRight={selected ? PANEL_PX : 0} />
           </Suspense>
         )}
       </div>

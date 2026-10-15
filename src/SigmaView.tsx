@@ -7,9 +7,12 @@ type Props = {
   selected: string | null
   onSelect: (id: string | null) => void
   fitSignal: number
+  /** How much of the right-hand side the panel covers, in px. The graph is fitted into what is
+   * left of it, which is the whole point: opening a node must not hide the other nodes. */
+  insetRight?: number
 }
 
-export default function SigmaView({ kg, selected, onSelect, fitSignal }: Props) {
+export default function SigmaView({ kg, selected, onSelect, fitSignal, insetRight }: Props) {
   const host = useRef<HTMLDivElement | null>(null)
   const sigma = useRef<Sigma | null>(null)
   const selRef = useRef<string | null>(selected)
@@ -72,9 +75,20 @@ export default function SigmaView({ kg, selected, onSelect, fitSignal }: Props) 
     sigma.current?.refresh()
   }, [selected])
 
+  // Re-fit when asked, and when the panel opens or closes — the renderer is narrower then, so
+  // the graph must be fitted again rather than left half-hidden behind the panel.
   useEffect(() => {
-    if (sigma.current) fitCamera(sigma.current.getCamera())
-  }, [fitSignal])
+    const s = sigma.current
+    if (!s) return
+    s.resize()
+    fitCamera(s.getCamera())
+  }, [fitSignal, insetRight])
 
-  return <div className="canvas" ref={host} />
+  return (
+    <div
+      className="canvas"
+      ref={host}
+      style={insetRight ? { width: `calc(100% - ${insetRight}px)` } : undefined}
+    />
+  )
 }

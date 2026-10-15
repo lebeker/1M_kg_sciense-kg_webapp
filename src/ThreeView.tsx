@@ -26,14 +26,14 @@ type FgInstance = {
 type Factory = (el: HTMLElement) => FgInstance
 type Component = (options?: Record<string, unknown>) => Factory
 
-type Props = { kg: Kg; onSelect: (id: string | null) => void }
+type Props = { kg: Kg; onSelect: (id: string | null) => void; insetRight?: number }
 
 /**
  * 3D view. `3d-force-graph` (and three with it) is imported dynamically, so the
  * bundler puts it in its own chunk and it is only fetched when this component
  * is first rendered.
  */
-export default function ThreeView({ kg, onSelect }: Props) {
+export default function ThreeView({ kg, onSelect, insetRight }: Props) {
   const host = useRef<HTMLDivElement | null>(null)
   const inst = useRef<FgInstance | null>(null)
   const selectRef = useRef(onSelect)
@@ -72,5 +72,20 @@ export default function ThreeView({ kg, onSelect }: Props) {
     }
   }, [kg])
 
-  return <div className="canvas" ref={host} />
+  // The panel narrows the renderer while this view is up, and 3d-force-graph only measures
+  // itself once — so it is told the new size, the same way the 2D view is refitted.
+  useEffect(() => {
+    const el = host.current
+    const g = inst.current
+    if (!el || !g) return
+    g.width(el.clientWidth).height(el.clientHeight)
+  }, [insetRight])
+
+  return (
+    <div
+      className="canvas"
+      ref={host}
+      style={insetRight ? { width: `calc(100% - ${insetRight}px)` } : undefined}
+    />
+  )
 }
