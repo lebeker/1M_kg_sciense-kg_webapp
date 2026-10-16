@@ -46,7 +46,6 @@ const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const tag = `viewer-v${pkg.version}`
 const sourceSha = git(['rev-parse', '--short', 'HEAD'])
 const branch = git(['branch', '--show-current'])
-
 // Provenance travels with the artifact: `kg.py apps` reads this and prints it.
 const origin = git(['remote', 'get-url', 'origin'])
   .replace(/^git@([^:]+):/, 'https://$1/')
@@ -85,6 +84,16 @@ try {
 } catch {
   parent = ''
 }
+// A tag names a version, and a published version is a thing people have already downloaded.
+// If this one exists at a different commit, the version in package.json was not bumped, and
+// saying so out loud is the difference between a release and an overwrite.
+let moved = ''
+try {
+  const old = git(['rev-parse', '--verify', `refs/tags/${tag}`])
+  moved = git(['rev-parse', '--short', old])
+} catch {
+  moved = ''
+}
 const message = `viewer v${pkg.version} — the built single-file viewer, no node needed to use it
 
 Built from ${sourceSha} on ${branch}. The source lives there; this branch carries only
@@ -98,6 +107,13 @@ rmSync(stampFile, { force: true })
 
 console.log(`dist branch -> ${commit.slice(0, 7)}  (viewer.html, viewer.version, app.json)`)
 console.log(`tag         -> ${tag}  (built from ${sourceSha})`)
+if (moved) {
+  console.log(
+    `\nwarning: ${tag} already existed at ${moved} and is being moved to ${commit.slice(0, 7)}.\n` +
+      '         A tag is meant to be a version nobody changes underneath them: bump the\n' +
+      '         version in package.json when publishing again.',
+  )
+}
 
 const push = (what) => {
   const r = spawnSync('git', ['push', '-f', 'origin', what], { cwd: root, encoding: 'utf8' })
