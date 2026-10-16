@@ -182,17 +182,22 @@ button {
 
 .panel dl {
   display: grid;
-  grid-template-columns: 64px 1fr;
+  /* A property name is whatever the graph says it is: it may be one word or a sentence, so
+     the name column takes what it needs up to a share of the panel and wraps rather than
+     running into the value. */
+  grid-template-columns: minmax(64px, 45%) minmax(0, 1fr);
   gap: 2px 8px;
   margin: 0 0 12px;
 }
 
 .panel dt {
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .panel dd {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .panel a {
