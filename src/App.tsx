@@ -281,51 +281,36 @@ export default function App() {
         kg.graph.hasNode(id) ? kindRank(kg, kg.graph.getNodeAttribute(id, 'kind') as string) : 0
       // A graph may say which relations mean *belongs to* (`meta.visuals.hierarchy`). When it
       // does, the descent crosses only those: a citation into a company's paper is a fact about
-      // the field, not a membership. With none declared it may cross any relation, and the test
-      // below is what keeps the map whole either way.
+      // the field, not a membership.
       const declared = (kg.meta?.visuals as { hierarchy?: unknown } | undefined)?.hierarchy
       const rels = Array.isArray(declared) ? new Set(declared.map(String)) : null
 
-      // 1. Everything below the level we started from, reachable from what was asked for.
-      const frontier = [...ids]
+      /**
+       * The tree under a node is walked **strictly downwards**: a step is allowed only from a
+       * node to a neighbour of a lower level than that node. A company takes its people, its
+       * people take their papers, and a paper has nothing below it, so the walk stops there.
+       *
+       * That single rule is what keeps a collapse a collapse. Walking down from the *node you
+       * started at* instead — which is what this did first — let the descent climb back up out of
+       * a paper into every co-author on the map: collapsing one company on the 81-node acceptance
+       * map hid 48 nodes. And the guard that replaced it (nothing the visible map still holds)
+       * was worse in the other direction: it left 56 of 59 nodes with a button that did nothing.
+       * Downhill only, from where you are.
+       */
+      const frontier = ids.filter((id) => kg.graph.hasNode(id) && rankOf(id) < ceiling)
       while (frontier.length) {
         const id = frontier.pop() as string
-        if (typeof id !== 'string' || out.has(id) || id === from || !kg.graph.hasNode(id)) continue
-        if (rankOf(id) >= ceiling) continue
+        if (typeof id !== 'string' || out.has(id) || id === from) continue
         out.add(id)
+        const here = rankOf(id)
         kg.graph.forEachEdge(id, (_key, a, src, tgt) => {
           if ((a as { agg?: boolean }).agg) return
           if (rels && !rels.has(String((a as { label?: unknown }).label ?? ''))) return
           const other = src === id ? tgt : src
-          if (!out.has(other)) frontier.push(other)
+          if (out.has(other) || other === from) return
+          if (rankOf(other) >= here) return
+          frontier.push(other)
         })
-      }
-
-      // 2. But nothing that is still held by the visible map can be folded away. A paper shared
-      // with another lab, a scientist who also works somewhere else: those are not this node's to
-      // hide. Without this, collapsing a company walks out through shared papers into every
-      // co-author on the map and takes the whole field with it — 48 of 81 nodes, which is not a
-      // collapse, it is a deletion.
-      //
-      // A neighbour of a *higher* level than we started from does not hold anything: concepts and
-      // the wider skeleton stay visible by design, and they are what a hidden paper is about.
-      for (let changed = true; changed; ) {
-        changed = false
-        for (const id of [...out]) {
-          let held = false
-          kg.graph.forEachEdge(id, (_key, a, src, tgt) => {
-            if (held) return
-            if ((a as { agg?: boolean }).agg) return
-            const other = src === id ? tgt : src
-            if (other === from || out.has(other)) return
-            if (rankOf(other) > ceiling) return
-            held = true
-          })
-          if (held) {
-            out.delete(id)
-            changed = true
-          }
-        }
       }
       return out
     },
