@@ -204,7 +204,11 @@ export default function SigmaView({
         const d = instance.getNodeDisplayData(id) as { size?: number } | undefined
         return ((d?.size ?? 4) * 2) / ratio
       }
-      const visible = (id: string) => !hiddenRef.current.has(id) && !calRef.current.has(id)
+      // `hasNode` before anything else: a caller can hand over an id that is not on the map
+      // (a collapse with no host, a stale selection), and asking the graph for its position
+      // throws — inside an effect, which takes the whole page down with it.
+      const visible = (id: string) =>
+        !!id && kg.graph.hasNode(id) && !hiddenRef.current.has(id) && !calRef.current.has(id)
       const point = (id: string) => {
         const n = kg.graph.getNodeAttributes(id) as { x: number; y: number }
         return at(n.x, n.y)
@@ -377,6 +381,7 @@ export default function SigmaView({
       window.clearTimeout(start)
       cancelAnimationFrame(raf)
       calRef.current = new Set()
+      setProgress(null)
       s.refresh()
     }
   }, [calibrating, kg, onMeasured])

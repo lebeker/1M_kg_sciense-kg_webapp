@@ -93,6 +93,9 @@ export default function App() {
   const [budget, setBudget] = useState<number | null>(null)
   const [overridden, setOverridden] = useState(false)
   const [doc, setDoc] = useState<string | null>(null)
+  /** Whether this host's own record has been consulted yet. Measuring before checking would
+   * throw away a number measured a minute ago in favour of measuring it again. */
+  const [checked, setChecked] = useState(false)
   const asked = useRef(false)
 
   useEffect(() => {
@@ -173,7 +176,7 @@ export default function App() {
   const declared = kg?.meta?.visuals?.max_nodes ?? null
   const budgetNow = budget ?? declared
   const overBudget = !!kg && budgetNow !== null && kg.graph.order > budgetNow && !overridden
-  const calibrating = !!kg && kg.graph.order > CALIBRATE_OVER && budget === null
+  const calibrating = !!kg && kg.graph.order > CALIBRATE_OVER && budget === null && checked
 
   // What the panel does not lay out itself, in a stable order — derived from the node, so a
   // graph carrying a field this app has never heard of still shows it.
@@ -196,8 +199,11 @@ export default function App() {
   }, [nodeAttrs, docs])
 
   const overview = useMemo(() => {
-    for (const k of ['overview', 'index', 'overview.md', 'index.md']) if (docs[k] !== undefined) return k
-    return null
+    // Keyed by their path in the graph's docs/ folder, so the subject's note is found by its
+    // name rather than by a key the folder happened to choose.
+    const keys = Object.keys(docs)
+    const byName = (name: string) => keys.find((k) => k.split('/').pop() === name) ?? null
+    return byName('overview.md') ?? byName('index.md')
   }, [docs])
 
   /** The mass hidden inside each node that has something collapsed into it. */
@@ -298,12 +304,90 @@ export default function App() {
     asked.current = true
     const stored = readBudget(kg.meta.app ?? 'kg')
     if (stored !== null) setBudget(stored)
+    setChecked(true)
   }, [kg])
 
   useEffect(() => {
     if (!kg || budget === null) return
     writeBudget(kg.meta.app ?? 'kg', budget)
   }, [kg, budget])
+
+  // Collapsed by concept, before the reader ever sees it: a graph bigger than the budget is not
+  // refused, it is drawn in part. The parts that go first are the members of a concept cluster —
+  // nodes that exist on this map only because of one subject — smallest and weakest first, and
+  // the concept they hang off wears a ring sized by the mass it is hiding. That is the difference
+  // between a big graph and a broken one.
+  const autoDone = useRef(false)
+  useEffect(() => {
+    if (!kg || !overBudget || autoDone.current) return
+    autoDone.current = true
+    const target = budgetNow ?? 0
+    const concepts = new Set<string>()
+    kg.graph.forEachNode((id, a) => {
+      if (a.kind === 'subject' || a.kind === 'concept') concepts.add(id)
+    })
+    const weight = (id: string) => (kg.graph.getNodeAttribute(id, 'weight') as number) ?? 0
+    // A member: not a concept itself, and nothing but concepts hold it on the map.
+    const members: { id: string; host: string; w: number }[] = []
+    kg.graph.forEachNode((id) => {
+      if (concepts.has(id)) return
+      const hosts: string[] = []
+      let other = 0
+      kg.graph.forEachNeighbor(id, (n) => {
+        if (concepts.has(n)) hosts.push(n)
+        else other += 1
+      })
+      if (hosts.length && other === 0) members.push({ id, host: hosts[0], w: weight(id) })
+    })
+    members.sort((a, b) => a.w - b.w)
+    const hiddenNow = new Set<string>()
+    const hosts = new Map<string, Set<string>>()
+    const put = (id: string, host: string | null) => {
+      hiddenNow.add(id)
+      // A node can be hidden without a host: a whole concept cluster has nothing left on the
+      // map to hang off, and inventing one would mean a ring around a node that is not there.
+      if (!host) return
+      const at = hosts.get(host) ?? new Set<string>()
+      at.add(id)
+      hosts.set(host, at)
+    }
+    // Pass one: members of concepts, weakest first, until the map fits.
+    for (const m of members) {
+      if (kg.graph.order - hiddenNow.size <= target) break
+      put(m.id, m.host)
+    }
+    // Pass two: if that was not enough, whole concept clusters go — the concept with everything
+    // that is only there because of it — and the count is what the banner is for.
+    if (kg.graph.order - hiddenNow.size > target) {
+      for (const c of concepts) {
+        if (kg.graph.order - hiddenNow.size <= target) break
+        if (hiddenNow.has(c)) continue
+        put(c, null)
+      }
+    }
+    // Pass three: the rest of the weakest. A node held by a single relation can go without the
+    // map losing its shape — and on a big map that is most of what there is to hide.
+    if (kg.graph.order - hiddenNow.size > target) {
+      const loose: { id: string; w: number }[] = []
+      kg.graph.forEachNode((id) => {
+        if (hiddenNow.has(id) || concepts.has(id)) return
+        if (kg.graph.degree(id) <= 1) loose.push({ id, w: weight(id) })
+      })
+      loose.sort((a, b) => a.w - b.w)
+      for (const l of loose) {
+        if (kg.graph.order - hiddenNow.size <= target) break
+        put(l.id, null)
+      }
+    }
+    if (hiddenNow.size) {
+      setHidden(hiddenNow)
+      setHosts(hosts)
+    }
+    // The banner then says what happened, and 'show all' brings it back.
+  }, [kg, overBudget, budgetNow, autoDone])
+
+  // Selecting something collapsed away brings it back: a search result you cannot see is not a
+  // result. (Kept above: the reveal is what makes the collapse safe to use.)
 
   // A measurement is a claim, and claims can be wrong in both directions: ten minutes of real
   // use at a size this host was not supposed to hold is evidence the claim was pessimistic, and
@@ -320,8 +404,9 @@ export default function App() {
       <header className="bar">
         <span className="title">{kg.meta.title ?? 'knowledge graph'}</span>
         <span className="count">
-          {hidden.size > 0 ? `${kg.graph.order - hidden.size} of ${kg.graph.order} nodes · ` : null}
-          {kg.graph.order} nodes · {kg.graph.size} edges
+          {hidden.size > 0
+            ? `${kg.graph.order - hidden.size} of ${kg.graph.order} nodes drawn · ${kg.graph.size} edges`
+            : `${kg.graph.order} nodes · ${kg.graph.size} edges`}
           {kg.layout === 'computed'
             ? ' · layout computed here'
             : kg.layout === 'rings'
@@ -369,7 +454,11 @@ export default function App() {
             budget {budgetNow} nodes{measureNote() ? ` · measured ${measureNote()}` : ''} — the
             rest is here, it is just not drawn
           </span>
-          <button onClick={() => setOverridden(true)}>expand anyway</button>
+          {hidden.size > 0 ? (
+            <button onClick={revealAll}>show all</button>
+          ) : (
+            <button onClick={() => setOverridden(true)}>expand anyway</button>
+          )}
         </div>
       ) : null}
 
