@@ -1,5 +1,14 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { type Kg, kindsOf, loadDocs, loadKg, weightOf } from './kg'
+import {
+  type Halo,
+  type Kg,
+  kindColor,
+  kindRank,
+  kindsOf,
+  loadDocs,
+  loadKg,
+  weightOf,
+} from './kg'
 import SigmaView from './SigmaView'
 import DocPanel from './DocPanel'
 import { measureNote, readBudget, watchWork, writeBudget } from './capacity'
@@ -24,7 +33,7 @@ type Conn = {
 }
 
 /** A relation word and the connections that carry it: one foldable block in the panel. */
-type Group = { rel: string; conns: Conn[] }
+type Group = { rel: string; conns: Conn[]; hideable: boolean }
 
 /** The width `.panel` covers on the right (styles.css), so the renderer can fit beside it. */
 const PANEL_PX = 341
@@ -46,6 +55,8 @@ const LAID_OUT = new Set([
 const EDGE_LAID_OUT = new Set([
   'from', 'to', 'label', 'dir', 'power', 'size', 'color', 'type', 'weight', 'time',
   'style', 'dash', 'width', 'authored_from', 'authored_to',
+  // `agg` says the view invented this line; it is not a property of the relation.
+  'agg',
 ])
 
 const DOI = /^10\.\d{4,9}\/\S+$/
@@ -88,6 +99,10 @@ export default function App() {
    * thickness is the mass that went into hiding. */
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [hosts, setHosts] = useState<Map<string, Set<string>>>(new Map())
+  /** Edges this view invented by contracting a collapse; taken away again on reveal. */
+  const aggRef = useRef<Set<string>>(new Set())
+  /** Bumped whenever the drawn graph changes without the document changing. */
+  const [graphVersion, setGraphVersion] = useState(0)
   const [folded, setFolded] = useState<Set<string>>(new Set())
   /** The node budget measured on this host, and whether the reader has insisted on more. */
   const [budget, setBudget] = useState<number | null>(null)
@@ -155,10 +170,22 @@ export default function App() {
       })
     })
     return out.sort((x, y) => y.power - x.power)
-  }, [kg, selected])
+    // graphVersion: a collapse adds and withdraws lines without the document changing, and the
+    // panel has to read the drawing, not the file.
+  }, [kg, selected, graphVersion])
 
   /** The same list, folded by relation word: what the panel shows a block at a time. */
   const groups = useMemo<Group[]>(() => {
+    // What sits below the node we are looking at: the same axis the collapse descends (kindRank),
+    // used here only to say whether the button can do anything at all.
+    const ceiling = !kg
+      ? 0
+      : kindRank(
+          kg,
+          kg.graph.hasNode(selected ?? '')
+            ? (kg.graph.getNodeAttribute(selected as string, 'kind') as string)
+            : undefined,
+        )
     const by = new Map<string, Conn[]>()
     for (const c of connections) {
       const key = c.rel || 'related'
@@ -166,8 +193,14 @@ export default function App() {
       if (at) at.push(c)
       else by.set(key, [c])
     }
-    return [...by.entries()].map(([rel, conns]) => ({ rel, conns }))
-  }, [connections])
+    return [...by.entries()].map(([rel, conns]) => ({
+      rel,
+      conns,
+      hideable: conns.some(
+        (c) => !!kg && kg.graph.hasNode(c.other) && kindRank(kg, kg.graph.getNodeAttribute(c.other, 'kind') as string) < ceiling,
+      ),
+    }))
+  }, [connections, kg, selected])
 
   /** What the numbers in `weight` measure, as the document itself states it. */
   const weightMetric = kg?.meta?.weight?.metric ?? 'connections'
@@ -206,69 +239,199 @@ export default function App() {
     return byName('overview.md') ?? byName('index.md')
   }, [docs])
 
-  /** The mass hidden inside each node that has something collapsed into it. */
+  /**
+   * What is hidden inside each node, broken down by kind: a ring per kind, in that kind's own
+   * colour, so a collapsed company reads differently from a collapsed researcher without a
+   * legend. Biggest mass first, because that is the ring drawn closest to the node.
+   */
   const halos = useMemo(() => {
-    const out = new Map<string, number>()
+    const out = new Map<string, Halo[]>()
     hosts.forEach((kids, host) => {
-      let mass = 0
-      kids.forEach((k) => kg && (mass += weightOf(kg, k)))
-      out.set(host, mass)
+      const by = new Map<string, Halo>()
+      kids.forEach((k) => {
+        if (!kg || !kg.graph.hasNode(k)) return
+        const kind = (kg.graph.getNodeAttribute(k, 'kind') as string | undefined) ?? 'other'
+        const cur = by.get(kind) ?? { kind, n: 0, mass: 0, color: kindColor(kg, kind) }
+        cur.n += 1
+        cur.mass += weightOf(kg, k)
+        by.set(kind, cur)
+      })
+      out.set(host, [...by.values()].sort((a, b) => b.mass - a.mass))
     })
     return out
   }, [hosts, kg])
 
   /**
-   * Hide these nodes, keeping the mass they carried visible as a ring on the node you collapsed
-   * them into.
+   * The tree under these nodes: everything reachable from them through relations to *lower*
+   * kinds, never a node at or above the level we started from.
    *
-   * A button the reader pressed is an instruction, so it is obeyed even when the node also hangs
-   * off something else — collapsing a cluster is supposed to take its lines away. (The automatic
-   * pass is the one that refuses to break the skeleton; nobody asked it for anything.)
+   * One axis, and it is the axis the document already declares for size (see `kindRank`). That
+   * is what makes "collapse Calico" mean something: the people and their papers are below a
+   * company and go; the concepts they are about are above it and stay. Collapsing from a paper
+   * therefore hides nothing at all, which is the honest answer rather than a special case.
    */
+  const descend = useCallback(
+    (ids: string[], fromKind?: string): Set<string> => {
+      const out = new Set<string>()
+      if (!kg) return out
+      // The level we start from is the node the collapse was asked for: nothing at or above it is
+      // ours to hide. That one rule is what makes the descent behave the way a reader expects — a
+      // company drops its people and their papers, while neither the concepts those papers are
+      // about nor a partner company is touched.
+      const rank = kindRank(kg, fromKind)
+      const frontier = [...ids]
+      while (frontier.length) {
+        const id = frontier.pop() as string
+        if (typeof id !== 'string' || !kg.graph.hasNode(id) || out.has(id)) continue
+        if (kindRank(kg, kg.graph.getNodeAttribute(id, 'kind') as string) >= rank) continue
+        out.add(id)
+        kg.graph.forEachEdge(id, (_key, a, src, tgt) => {
+          if ((a as { agg?: boolean }).agg) return
+          const other = src === id ? tgt : src
+          if (!out.has(other)) frontier.push(other)
+        })
+      }
+      return out
+    },
+    [kg],
+  )
+
+  /**
+   * The lines that were only there because of what is now hidden: each hidden node is contracted
+   * into its visible neighbours, which are then joined to each other. So a company that loses two
+   * authors keeps one line to the subject they both worked on, at power 2 — and two subjects that
+   * met only through a hidden paper keep their line.
+   *
+   * These lines are the view's own: they are added to the drawing, never to the document.
+   */
+  const aggregate = useCallback(
+    (hiddenSet: Set<string>, host: string | null) => {
+      if (!kg) return
+      // Whatever this view invented last time goes first, so the drawing is a function of what is
+      // collapsed now and not a growing pile of leftovers.
+      aggRef.current.forEach((key) => {
+        if (kg.graph.hasEdge(key)) kg.graph.dropEdge(key)
+      })
+      aggRef.current.clear()
+      if (!hiddenSet.size || !host || !kg.graph.hasNode(host)) {
+        setGraphVersion((v) => v + 1)
+        return
+      }
+      /**
+       * What the hidden mass still touches, counted: every visible node gets one line to the node
+       * the collapse came from, at the power of how many hidden things reached it. Collapse Calico
+       * and two of its people's papers about model organisms give Calico one line to model
+       * organisms at power 2, and one paper on dietary restriction gives a line at power 1.
+       *
+       * The lines go through the host rather than being invented between the concepts themselves:
+       * the document never said those two concepts touch, and a collapse is not a licence to say
+       * it did. Through the host they stay one hop apart, which is what the graph actually holds.
+       */
+      const count = new Map<string, number>()
+      hiddenSet.forEach((h) => {
+        if (!kg.graph.hasNode(h)) return
+        kg.graph.forEachEdge(h, (_key, a, src, tgt) => {
+          if ((a as { agg?: boolean }).agg) return
+          const other = src === h ? tgt : src
+          if (hiddenSet.has(other) || other === host) return
+          if (!kg.graph.hasNode(other)) return
+          count.set(other, (count.get(other) ?? 0) + 1)
+        })
+      })
+      count.forEach((n, v) => {
+        // A real relation between the two is already there and speaks for itself.
+        if (kg.graph.hasEdge(host, v)) return
+        const key = `agg:${host}|${v}`
+        try {
+          kg.graph.addEdgeWithKey(key, host, v, {
+            agg: true,
+            power: n,
+            style: 'dashed',
+            color: '#6f7b8f',
+            // One relation word for every invented line, so the panel folds them into a single
+            // block and the number the reader sees is the power, where it belongs.
+            label: 'through what is collapsed',
+          })
+          aggRef.current.add(key)
+        } catch {
+          // The document is data, not a promise: an edge it refuses is skipped, not fatal.
+        }
+      })
+      setGraphVersion((v) => v + 1)
+    },
+    [kg],
+  )
+
   const collapse = useCallback(
     (ids: string[]) => {
       if (!kg || !selected) return
-      const keep = new Set(hidden)
-      const taken: string[] = []
-      for (const id of ids) {
-        if (keep.has(id) || id === selected) continue
-        keep.add(id)
-        taken.push(id)
+      const fromKind = kg.graph.getNodeAttribute(selected, 'kind') as string | undefined
+      const add = descend(ids, fromKind)
+      if (!add.size) return
+      const next = new Set(hidden)
+      add.forEach((id) => next.add(id))
+      setHidden(next)
+      setHosts((prev) => {
+        const m = new Map(prev)
+        const at = new Set(m.get(selected) ?? [])
+        add.forEach((id) => at.add(id))
+        m.set(selected, at)
+        return m
+      })
+      aggregate(next, selected)
+    },
+    [kg, selected, hidden, descend, aggregate],
+  )
+
+  const reveal = useCallback(
+    (host: string) => {
+      const kids = hosts.get(host)
+      if (kids) {
+        setHidden((h) => {
+          const out = new Set(h)
+          kids.forEach((k) => out.delete(k))
+          aggregate(out, host)
+          return out
+        })
       }
-      if (!taken.length) return
-      setHidden(keep)
       setHosts((prev) => {
         const next = new Map(prev)
-        const at = new Set(next.get(selected) ?? [])
-        taken.forEach((id) => at.add(id))
-        next.set(selected, at)
+        next.delete(host)
         return next
       })
     },
-    [kg, selected, hidden],
+    [hosts, aggregate],
   )
 
-  const reveal = useCallback((host: string) => {
-    const kids = hosts.get(host)
-    if (kids) {
-      setHidden((h) => {
-        const out = new Set(h)
-        kids.forEach((k) => out.delete(k))
-        return out
+  /** Show exactly what this group put away, leaving other collapses alone. */
+  const revealSome = useCallback(
+    (ids: string[]) => {
+      const under = descend(ids)
+      const gone = [...under].filter((id) => hidden.has(id))
+      if (!gone.length) return
+      const next = new Set(hidden)
+      gone.forEach((id) => next.delete(id))
+      setHidden(next)
+      setHosts((prev) => {
+        const m = new Map(prev)
+        m.forEach((kids, host) => {
+          const kept = new Set([...kids].filter((k) => !gone.includes(k)))
+          if (kept.size) m.set(host, kept)
+          else m.delete(host)
+        })
+        return m
       })
-    }
-    setHosts((prev) => {
-      const next = new Map(prev)
-      next.delete(host)
-      return next
-    })
-  }, [hosts])
+      aggregate(next, selected)
+    },
+    [descend, hidden, selected, aggregate],
+  )
 
   const revealAll = useCallback(() => {
     setHidden(new Set())
     setHosts(new Map())
+    aggregate(new Set(), null)
     setOverridden(true)
-  }, [])
+  }, [aggregate])
 
   // Selecting something collapsed away brings it back: a search result you cannot see is not a
   // result.
@@ -392,6 +555,7 @@ export default function App() {
     if (hiddenNow.size) {
       setHidden(hiddenNow)
       setHosts(hosts)
+      aggregate(hiddenNow, null)
     }
     // The banner then says what happened, and 'show all' brings it back.
   }, [kg, overBudget, budgetNow, autoDone])
@@ -502,6 +666,7 @@ export default function App() {
             focus={focus}
             hoverEdge={hoverEdge}
             halos={halos}
+            graphVersion={graphVersion}
             hidden={hidden}
             arrows={kg.meta?.visuals?.arrows ?? false}
             edgeScale={kg.meta?.visuals?.edge_width ?? 1}
@@ -513,6 +678,7 @@ export default function App() {
             <ThreeView
               kg={kg}
               onSelect={onSelect}
+              halos={halos}
               insetRight={selected ? PANEL_PX : 0}
               focus={focus}
               hidden={hidden}
@@ -585,10 +751,17 @@ export default function App() {
 
           {/* What this node has hidden inside it, said out loud: a collapsed map that does not
               say what it is hiding is a lie about the map. */}
-          {selected && hosts.get(selected)?.size ? (
+          {selected && halos.get(selected)?.length ? (
             <p className="collapsed">
               <b>{hosts.get(selected)?.size}</b>{' '}
-              {hosts.get(selected)?.size === 1 ? 'node is' : 'nodes are'} collapsed here —{' '}
+              {hosts.get(selected)?.size === 1 ? 'node is' : 'nodes are'} collapsed here
+              {halos.get(selected)?.map((h) => (
+                <span className="halo-kind" key={h.kind} style={{ color: h.color }}>
+                  {' '}
+                  {h.n} {h.kind}
+                </span>
+              ))}{' '}
+              —{' '}
               <button className="link" onClick={() => reveal(selected)}>
                 show them
               </button>
@@ -622,10 +795,21 @@ export default function App() {
                     <i>{g.conns.length}</i>
                     <button
                       className="tiny"
-                      title="hide these nodes; they stay accounted for in the ring"
-                      onClick={() => collapse(g.conns.map((c) => c.other))}
+                      disabled={!g.hideable && !g.conns.some((c) => hidden.has(c.other))}
+                      title={
+                        g.conns.some((c) => hidden.has(c.other))
+                          ? 'bring back what this group put away'
+                          : g.hideable
+                            ? 'hide what hangs below these nodes; the ring keeps count'
+                            : 'nothing sits below these — a collapse descends from the thing above them'
+                      }
+                      onClick={() =>
+                        g.conns.some((c) => hidden.has(c.other))
+                          ? revealSome(g.conns.map((c) => c.other))
+                          : collapse(g.conns.map((c) => c.other))
+                      }
                     >
-                      collapse
+                      {g.conns.some((c) => hidden.has(c.other)) ? 'show' : 'collapse'}
                     </button>
                   </div>
                   {folded.has(g.rel) ? null : (
@@ -633,7 +817,8 @@ export default function App() {
                       {g.conns.map((c) => (
                         <li key={c.key}>
                           <button
-                            className="conn"
+                            className={hidden.has(c.other) ? 'conn hidden-conn' : 'conn'}
+                            title={hidden.has(c.other) ? 'this is inside the collapse — show it to see it in the map' : undefined}
                             onMouseEnter={() => setHoverEdge(c.key)}
                             onMouseLeave={() => setHoverEdge(null)}
                             onClick={() => onFollow(c.other)}
@@ -644,6 +829,7 @@ export default function App() {
                                 {c.arrow} {c.rel || 'related'}
                               </span>
                               <span className="power">×{c.power}</span>
+                              {hidden.has(c.other) ? <span className="tag">collapsed</span> : null}
                             </span>
                             <span className="other">{c.label}</span>
                             {c.extra.length > 0 ? (

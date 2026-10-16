@@ -8,7 +8,7 @@ import {
   EdgeTriangleProgram,
   createEdgeArrowProgram,
 } from 'sigma/rendering'
-import { type Kg, edgeDash, edgePx, edgeShape, pxSize } from './kg'
+import { type Halo, type Kg, edgeDash, edgePx, edgeShape, pxSize } from './kg'
 
 type Props = {
   kg: Kg
@@ -26,8 +26,10 @@ type Props = {
   focus?: { id: string; n: number } | null
   /** A relation the reader is pointing at in the panel: drawn emphasised, over the top. */
   hoverEdge?: string | null
-  /** Nodes that have nodes hidden around them -> the mass hidden, for the ring. */
-  halos?: Map<string, number>
+  /** What is hidden around a node -> one entry per kind, for one ring each. */
+  halos?: Map<string, Halo[]>
+  /** Bumped when edges were invented or withdrawn without the document changing. */
+  graphVersion?: number
   /** Nodes the reader (or the measured budget) has collapsed away. */
   hidden?: Set<string>
   /** Does a directed relation get a head by default? The graph decides; this is that decision. */
@@ -82,6 +84,7 @@ export default function SigmaView({
   focus,
   hoverEdge,
   halos,
+  graphVersion,
   hidden,
   arrows = false,
   edgeScale = 1,
@@ -93,7 +96,7 @@ export default function SigmaView({
   const selRef = useRef<string | null>(selected)
   const selectRef = useRef(onSelect)
   const hoverRef = useRef<string | null>(null)
-  const halosRef = useRef<Map<string, number>>(new Map())
+  const halosRef = useRef<Map<string, Halo[]>>(new Map())
   const hiddenRef = useRef<Set<string>>(new Set())
   const calRef = useRef<Set<string>>(new Set())
   const drawRef = useRef<() => void>(() => {})
@@ -265,17 +268,21 @@ export default function SigmaView({
 
       // Rings: a node with nodes collapsed inside it says how much is hidden, and collapsing a
       // small weak thing and a large strong one should not look the same.
-      halosRef.current.forEach((mass, id) => {
+      halosRef.current.forEach((kinds, id) => {
         if (!visible(id)) return
         const p = point(id)
-        ctx.save()
-        ctx.strokeStyle = 'rgba(150,190,255,0.55)'
-        // Thicker with what it hides, and never so thin that it reads as a stray pixel.
-        ctx.lineWidth = 1.5 + Math.min(5, Math.sqrt(Math.max(0, mass)) * 0.7)
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, radius(id) + 4, 0, Math.PI * 2)
-        ctx.stroke()
-        ctx.restore()
+        // One ring per kind, in that kind's own colour, the heaviest closest to the node — so a
+        // collapsed company and a collapsed researcher are told apart without reading anything.
+        kinds.forEach((h, i) => {
+          ctx.save()
+          ctx.strokeStyle = h.color
+          ctx.globalAlpha = 0.75
+          ctx.lineWidth = 1.5 + Math.min(4, Math.sqrt(Math.max(0, h.mass)) * 0.7)
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, radius(id) + 5 + i * 4, 0, Math.PI * 2)
+          ctx.stroke()
+          ctx.restore()
+        })
       })
     }
     drawRef.current = draw
@@ -308,7 +315,7 @@ export default function SigmaView({
   useEffect(() => {
     sigma.current?.refresh()
     drawRef.current()
-  }, [hidden, hoverEdge, halos])
+  }, [hidden, hoverEdge, halos, graphVersion])
 
   // ── measuring this host ────────────────────────────────────────────────────────────────
   // The budget is what this machine can draw, so it is measured on this machine: the graph is
@@ -420,7 +427,8 @@ export default function SigmaView({
       // it was asked to draw is hard to see from the outside, and this is how a test sees it.
       data-drawn={kg.graph.order - (hidden?.size ?? 0)}
       data-collapsed={hidden?.size ?? 0}
-      data-rings={halos?.size ?? 0}
+      // how many rings are on screen, not how many nodes wear them
+      data-rings={[...(halos?.values() ?? [])].reduce((n, k) => n + k.length, 0)}
       style={insetRight ? { width: `calc(100% - ${insetRight}px)` } : undefined}
     >
       {progress ? (

@@ -1,37 +1,33 @@
-import { useEffect, useRef } from 'react'
-import { type ForceGraphData, type ForceLink, type ForceNode, toForceGraph } from './adapters/forceGraph'
-import { type Kg, edgeDash, edgePx, edgeShape } from './kg'
+import { useEffect, useRef, useState } from 'react'
+import { type ForceGraphData, type ForceNode, toForceGraph } from './adapters/forceGraph'
+import { type Halo, type Kg, edgeDash, edgePx, edgeShape } from './kg'
 
-// Minimal shape of the 3d-force-graph instance we actually use. The published
-// typings describe `new ForceGraph3D(el)`, but the runtime export is a kapsule
-// component whose documented form is `ForceGraph3D()(el)` — so the module is
-// cast once, here, instead of typing every chainable setter.
-type FgInstance = {
-  width: (w: number) => FgInstance
-  height: (h: number) => FgInstance
-  backgroundColor: (c: string) => FgInstance
-  nodeRelSize: (v: number) => FgInstance
-  nodeLabel: (f: (n: ForceNode) => string) => FgInstance
-  nodeColor: (f: (n: ForceNode) => string) => FgInstance
-  nodeVal: (f: (n: ForceNode) => number) => FgInstance
-  linkWidth: (f: (l: ForceLink) => number) => FgInstance
-  linkColor: (f: (l: ForceLink) => string) => FgInstance
-  linkLineDash: (f: (l: ForceLink) => number[] | null) => FgInstance
-  linkDirectionalArrowLength: (f: (l: ForceLink) => number) => FgInstance
-  cameraPosition: (
-    pos: { x: number; y: number; z: number },
-    lookAt?: { x: number; y: number; z: number },
-    ms?: number,
-  ) => FgInstance
-  onNodeClick: (f: (n: ForceNode) => void) => FgInstance
-  onEngineStop: (f: () => void) => FgInstance
-  zoomToFit: (ms?: number, padding?: number) => FgInstance
-  graphData: (d: unknown) => FgInstance
-  _destructor: () => void
+/**
+ * The 3d-force-graph instance, as an open bag of chainable setters.
+ *
+ * It is typed this way on purpose: the library's surface differs between builds — 1.80 has no
+ * `linkLineDash` at all — and calling a method that is not there threw away the whole view. Every
+ * setter now goes through `set()`, which uses what this build has and says nothing about the rest.
+ */
+type Fg = {
+  [method: string]: (...args: never[]) => unknown
 }
 
-type Factory = (el: HTMLElement) => FgInstance
-type Component = (options?: Record<string, unknown>) => Factory
+/** Chainable, but only if this build has it. */
+function set(api: Fg, method: string, value: unknown): Fg {
+  const fn = api[method]
+  if (typeof fn === 'function') (fn as unknown as (v: unknown) => void).call(api, value)
+  return api
+}
+
+/** The minimum of three.js this file uses; the rest is the library's business. */
+type ThreeMesh = { userData: Record<string, number> }
+type ThreeApi = {
+  Group: new () => { add: (o: unknown) => void; children: ThreeMesh[] }
+  Mesh: new (geo: unknown, mat: unknown) => ThreeMesh
+  SphereGeometry: new (r: number, a: number, b: number) => unknown
+  MeshBasicMaterial: new (o: Record<string, unknown>) => unknown
+}
 
 type Props = {
   kg: Kg
@@ -41,6 +37,8 @@ type Props = {
   focus?: { id: string; n: number } | null
   /** Nodes collapsed away in the 2D view stay collapsed here: one map, one reading. */
   hidden?: Set<string>
+  /** What is collapsed inside a node, per kind — drawn here as a cloud with nodes in orbit. */
+  halos?: Map<string, Halo[]>
   /** Does a directed relation get a head by default? The graph decides. */
   arrows?: boolean
   /** Multiplies every relation's width. The graph decides. */
@@ -48,52 +46,142 @@ type Props = {
 }
 
 /**
- * 3D view. `3d-force-graph` (and three with it) is imported dynamically, so the
- * bundler puts it in its own chunk and it is only fetched when this component
- * is first rendered.
+ * 3D view. `3d-force-graph` (and three with it) is imported dynamically, so the bundler puts it
+ * in its own chunk and it is only fetched when this component is first rendered.
  */
-export default function ThreeView({ kg, onSelect, insetRight, focus, hidden, arrows = false, edgeScale = 1 }: Props) {
+export default function ThreeView({
+  kg,
+  onSelect,
+  insetRight,
+  focus,
+  hidden,
+  halos,
+  arrows = false,
+  edgeScale = 1,
+}: Props) {
   const host = useRef<HTMLDivElement | null>(null)
-  const inst = useRef<FgInstance | null>(null)
+  const inst = useRef<Fg | null>(null)
   /** The objects handed to the 3D engine; it writes x/y/z back onto them in place. */
   const data = useRef<ForceGraphData | null>(null)
+  /** Every cloud currently in the scene, so the tick can turn its nodes. */
+  const clouds = useRef<{ children: ThreeMesh[] }[]>([])
+  /** Whether the engine came up: the element says so, so a test does not have to guess. */
+  const [ready, setReady] = useState(false)
+  const [drawn, setDrawn] = useState(0)
   const selectRef = useRef(onSelect)
   selectRef.current = onSelect
+  const observers = useRef<ResizeObserver | null>(null)
+  const halosRef = useRef<Map<string, Halo[]>>(new Map())
+  halosRef.current = halos ?? new Map()
 
   useEffect(() => {
     const el = host.current
     if (!el) return
     let dead = false
 
-    import('3d-force-graph')
-      .then((mod) => {
+    Promise.all([import('3d-force-graph'), import('three')])
+      .then(([mod, threeMod]) => {
         if (dead) return
-        const ForceGraph3D = mod.default as unknown as Component
+        const THREE = threeMod as unknown as ThreeApi
+        const ForceGraph3D = mod.default as unknown as (opts?: Record<string, unknown>) => (el: HTMLElement) => Fg
         const g = ForceGraph3D()(el)
         // Fresh objects, kept in a ref: the engine writes x/y/z back onto them in place, and
         // that is how "fly to this node" finds where it ended up.
         const fresh = toForceGraph(kg, hidden)
         data.current = fresh
-        g.width(el.clientWidth)
-          .height(el.clientHeight)
-          .backgroundColor('#14161a')
-          .nodeRelSize(3)
-          .nodeLabel((n) => n.label ?? n.id ?? '')
-          .nodeColor((n) => n.color ?? '#7b9ecb')
-          .nodeVal((n) => n.size ?? 2)
-          // The same reading as 2D, from the same document: width from `power`, the pattern
-          // from `style`, a head only where a direction was asked for. 3D can draw dashes
-          // natively, which is why this view has no overlay and the 2D one does.
-          .linkWidth((l) => edgePx(l as unknown as Record<string, unknown>, edgeScale))
-          .linkColor((l) => l.color ?? '#525c6b')
-          .linkLineDash((l) => edgeDash(l as unknown as Record<string, unknown>) ?? null)
-          .linkDirectionalArrowLength((l) =>
-            edgeShape(l as unknown as Record<string, unknown>, arrows) === 'line' ? 0 : 3,
-          )
-          .onNodeClick((n) => selectRef.current(n.id ?? null))
-          .onEngineStop(() => g.zoomToFit(600, 40))
-          .graphData(fresh)
+        clouds.current = []
+
+        /**
+         * A node that has something collapsed inside it wears a cloud: one translucent sphere per
+         * hidden kind in that kind's own colour, and a few small nodes turning on their own orbit
+         * — each at its own radius and level, so the cloud reads as a place rather than a sticker.
+         */
+        const cloud = (node: ForceNode) => {
+          const kinds = halosRef.current.get(node.id ?? '')
+          if (!kinds?.length) return undefined
+          const group = new THREE.Group()
+          kinds.forEach((h, i) => {
+            const r = 7 + i * 3.5 + Math.min(10, Math.sqrt(Math.max(0, h.mass)) * 1.6)
+            group.add(
+              new THREE.Mesh(
+                new THREE.SphereGeometry(r, 16, 12),
+                new THREE.MeshBasicMaterial({
+                  color: h.color,
+                  transparent: true,
+                  opacity: 0.16,
+                  depthWrite: false,
+                }),
+              ),
+            )
+            const dots = Math.min(6, Math.max(2, h.n))
+            for (let d = 0; d < dots; d += 1) {
+              const dot = new THREE.Mesh(
+                new THREE.SphereGeometry(1.1, 8, 6),
+                new THREE.MeshBasicMaterial({ color: h.color, transparent: true, opacity: 0.85 }),
+              )
+              dot.userData = {
+                orbit: r + 2.5 + Math.random() * 3,
+                phase: Math.random() * Math.PI * 2,
+                speed: 0.004 + Math.random() * 0.006,
+                lift: (Math.random() - 0.5) * r * 0.6,
+              }
+              group.add(dot)
+            }
+          })
+          clouds.current.push(group)
+          return group
+        }
+
+        set(g, 'width', el.clientWidth)
+        set(g, 'height', el.clientHeight)
+        set(g, 'backgroundColor', '#14161a')
+        set(g, 'nodeRelSize', 3)
+        set(g, 'nodeLabel', (n: ForceNode) => n.label ?? n.id ?? '')
+        set(g, 'nodeColor', (n: ForceNode) => n.color ?? '#7b9ecb')
+        set(g, 'nodeVal', (n: ForceNode) => n.size ?? 2)
+        // The same reading as 2D, from the same document: width from `power`, colour from the
+        // edge, a head only where a direction was asked for.
+        set(g, 'linkWidth', (l: Record<string, unknown>) => edgePx(l, edgeScale))
+        set(g, 'linkColor', (l: Record<string, unknown>) => (l.color as string) ?? '#525c6b')
+        set(g, 'linkDirectionalArrowLength', (l: Record<string, unknown>) =>
+          edgeShape(l, arrows) === 'line' ? 0 : 3,
+        )
+        // This build has no dashed line, so a weak relation is drawn the way a hairline reads
+        // best in 3D: a couple of slow particles travelling along it.
+        set(g, 'linkDirectionalParticles', (l: Record<string, unknown>) => (edgeDash(l) ? 3 : 0))
+        set(g, 'linkDirectionalParticleWidth', () => 1.2)
+        set(g, 'linkDirectionalParticleSpeed', () => 0.004)
+        set(g, 'linkDirectionalParticleColor', (l: Record<string, unknown>) => (l.color as string) ?? '#8b96a8')
+        set(g, 'nodeThreeObject', cloud)
+        set(g, 'nodeThreeObjectExtend', true)
+        set(g, 'onEngineTick', () => {
+          clouds.current.forEach((group) => {
+            group.children.forEach((child) => {
+              const u = child.userData
+              if (!u || typeof u.orbit !== 'number') return
+              u.phase += u.speed
+              const mesh = child as unknown as { position: { set: (x: number, y: number, z: number) => void } }
+              mesh.position.set(Math.cos(u.phase) * u.orbit, u.lift, Math.sin(u.phase) * u.orbit)
+            })
+          })
+        })
+        set(g, 'onNodeClick', (n: ForceNode) => selectRef.current(n.id ?? null))
+        set(g, 'onEngineStop', () => set(g, 'zoomToFit', undefined))
+        set(g, 'graphData', fresh)
         inst.current = g
+
+        // 3d-force-graph measures itself when it is told to, once — and at mount this element has
+        // not been laid out yet, so it starts at zero size and draws nothing. The same observer
+        // the 2D view uses keeps it honest, and the first real size is the moment to fit.
+        const ro = new ResizeObserver(() => {
+          if (dead || !host.current) return
+          set(g, 'width', host.current.clientWidth)
+          set(g, 'height', host.current.clientHeight)
+        })
+        ro.observe(el)
+        observers.current = ro
+        setReady(true)
+        setDrawn(fresh.nodes.length)
       })
       .catch((err: unknown) => {
         console.error('3d-force-graph failed to load:', err)
@@ -101,11 +189,15 @@ export default function ThreeView({ kg, onSelect, insetRight, focus, hidden, arr
 
     return () => {
       dead = true
-      inst.current?._destructor?.()
+      observers.current?.disconnect()
+      observers.current = null
+      const api = inst.current
+      if (api && typeof api._destructor === 'function') (api._destructor as () => void).call(api)
       inst.current = null
       data.current = null
+      clouds.current = []
     }
-  }, [kg, hidden, arrows, edgeScale])
+  }, [kg, hidden, halos, arrows, edgeScale])
 
   // Follow a connection in 3D: park the camera along the line from the origin to the node, the
   // standard way to look at one thing without losing where it is.
@@ -118,7 +210,8 @@ export default function ThreeView({ kg, onSelect, insetRight, focus, hidden, arr
     const pos = { x: n.x, y: n.y, z: n.z ?? 0 }
     const len = Math.hypot(pos.x, pos.y, pos.z) || 1
     const k = 1 + 220 / len
-    g.cameraPosition({ x: pos.x * k, y: pos.y * k, z: pos.z * k }, pos, 700)
+    const camera = g.cameraPosition as unknown as (a: typeof pos, b: typeof pos, ms: number) => void
+    camera.call(g, { x: pos.x * k, y: pos.y * k, z: pos.z * k }, pos, 700)
   }, [focus])
 
   // The panel narrows the renderer while this view is up, and 3d-force-graph only measures
@@ -127,13 +220,16 @@ export default function ThreeView({ kg, onSelect, insetRight, focus, hidden, arr
     const el = host.current
     const g = inst.current
     if (!el || !g) return
-    g.width(el.clientWidth).height(el.clientHeight)
+    set(g, 'width', el.clientWidth)
+    set(g, 'height', el.clientHeight)
   }, [insetRight])
 
   return (
     <div
       className="canvas"
       ref={host}
+      data-3d={ready ? 'up' : 'loading'}
+      data-3d-nodes={drawn}
       style={insetRight ? { width: `calc(100% - ${insetRight}px)` } : undefined}
     />
   )

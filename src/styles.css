@@ -477,3 +477,11 @@ button.tiny:hover, button.link:hover { color: #cfe0ff; }
 }
 .doc footer .note { margin-right: auto; font-size: 11px; color: #93a0b4; }
 .doc footer button.agent { border-color: #8fa3c8; color: #cfe0ff; }
+
+/* A row inside a collapse: still the document's word, greyed so it reads as put away. */
+.conn.hidden-conn { opacity: 0.55; }
+.conn.hidden-conn .tag {
+  margin-left: 6px; padding: 0 4px; border: 1px solid var(--border); border-radius: 3px;
+  font-size: 10px; color: var(--muted-foreground); text-transform: lowercase;
+}
+.halo-kind { font-variant-numeric: tabular-nums; }

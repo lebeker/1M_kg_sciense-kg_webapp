@@ -539,3 +539,31 @@ export function weightOf(kg: Kg, id: string): number {
   if (typeof a.px === 'number') return a.px
   return 1
 }
+
+
+/**
+ * How high a kind sits: the multiplier the document already declares for weight.
+ *
+ * One axis, used twice — a node's size, and how far a collapse may reach. A concept (10) is
+ * above a lab (3), which is above a researcher (1), which is above a paper (0.1); collapsing
+ * descends that order and never climbs it. With the default multipliers no collapse can hide a
+ * concept, and a paper can hide nothing, both of which are the intended behaviour rather than a
+ * special case in the code.
+ */
+export function kindRank(kg: Kg, kind: string | undefined): number {
+  const mul = kg.meta?.weight?.kind_multipliers
+  const declared = kind ? mul?.[kind] : undefined
+  if (typeof declared === 'number') return declared
+  return kind ? (DEFAULT_KIND_MULTIPLIERS[kind] ?? 1) : 1
+}
+
+/** What is collapsed inside a node, per kind: what the rings and the clouds are made of. */
+export type Halo = { kind: string; n: number; mass: number; color: string }
+
+/** The colour a kind is drawn in — the graph's own, else the starter palette, else a hash. */
+export function kindColor(kg: Kg, kind: string): string {
+  const declared = kg.meta?.colors?.[kind]
+  if (typeof declared === 'string') return declared
+  if (STARTER_PALETTE[kind]) return STARTER_PALETTE[kind]
+  return hashColor(kind)
+}

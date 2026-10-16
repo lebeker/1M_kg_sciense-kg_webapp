@@ -22,12 +22,10 @@ type Props = {
  * the owner is not the browser.
  */
 export default function DocPanel({ name, md, onClose }: Props) {
-  const [editing, setEditing] = useState(false)
-  const [text, setText] = useState(md)
+  const text = md
   const [saved, setSaved] = useState<string | null>(null)
   const path = name.startsWith('docs/') ? name : `docs/${name.endsWith('.md') ? name : `${name}.md`}`
-  const html = useMemo(() => mdToHtml(editing ? text : md), [editing, text, md])
-  const dirty = text !== md
+  const html = useMemo(() => mdToHtml(md), [md])
 
   const download = () => {
     const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
@@ -54,24 +52,20 @@ export default function DocPanel({ name, md, onClose }: Props) {
       <header>
         <code className="path">{path}</code>
         <div className="spacer" />
-        <button className={editing ? 'on' : ''} onClick={() => setEditing((v) => !v)}>
-          {editing ? 'reading' : 'edit'}
+        <button
+          className="off"
+          disabled
+          title="a page opened from a file cannot write to your disk. The agent holds the file: hand the note over and it edits docs/ itself. Copy or download it from here if you want it in hand."
+        >
+          edit
         </button>
         <button onClick={onClose}>×</button>
       </header>
 
-      {editing ? (
-        <>
-          <textarea
-            className="doc-edit"
-            value={text}
-            spellCheck={false}
-            onChange={(e) => setText(e.target.value)}
-          />
+      <>
+          <div className="doc-body" dangerouslySetInnerHTML={{ __html: html }} />
           <footer>
-            <span className="note">
-              {saved ?? (dirty ? 'edited here — the file on disk is unchanged' : 'pick a way back to disk')}
-            </span>
+            <span className="note">{saved ?? 'the file is the source of truth — this is a copy'}</span>
             <button onClick={copy}>copy</button>
             <button onClick={download}>download</button>
             {/* In the Hermes pane this arrives as a prompt; in a plain browser it is inert,
@@ -83,10 +77,7 @@ export default function DocPanel({ name, md, onClose }: Props) {
               hand it to the agent
             </button>
           </footer>
-        </>
-      ) : (
-        <div className="doc-body" dangerouslySetInnerHTML={{ __html: html }} />
-      )}
+      </>
     </aside>
   )
 }
