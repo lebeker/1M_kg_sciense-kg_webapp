@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { type ForceGraphData, type ForceLink, type ForceNode, toForceGraph } from './adapters/forceGraph'
-import type { Kg } from './kg'
+import { type Kg, edgeDash, edgePx, edgeShape } from './kg'
 
 // Minimal shape of the 3d-force-graph instance we actually use. The published
 // typings describe `new ForceGraph3D(el)`, but the runtime export is a kapsule
@@ -15,6 +15,8 @@ type FgInstance = {
   nodeColor: (f: (n: ForceNode) => string) => FgInstance
   nodeVal: (f: (n: ForceNode) => number) => FgInstance
   linkWidth: (f: (l: ForceLink) => number) => FgInstance
+  linkColor: (f: (l: ForceLink) => string) => FgInstance
+  linkLineDash: (f: (l: ForceLink) => number[] | null) => FgInstance
   linkDirectionalArrowLength: (f: (l: ForceLink) => number) => FgInstance
   cameraPosition: (
     pos: { x: number; y: number; z: number },
@@ -37,6 +39,12 @@ type Props = {
   insetRight?: number
   /** Put this node in the middle of the view (see SigmaView). */
   focus?: { id: string; n: number } | null
+  /** Nodes collapsed away in the 2D view stay collapsed here: one map, one reading. */
+  hidden?: Set<string>
+  /** Does a directed relation get a head by default? The graph decides. */
+  arrows?: boolean
+  /** Multiplies every relation's width. The graph decides. */
+  edgeScale?: number
 }
 
 /**
@@ -44,7 +52,7 @@ type Props = {
  * bundler puts it in its own chunk and it is only fetched when this component
  * is first rendered.
  */
-export default function ThreeView({ kg, onSelect, insetRight, focus }: Props) {
+export default function ThreeView({ kg, onSelect, insetRight, focus, hidden, arrows = false, edgeScale = 1 }: Props) {
   const host = useRef<HTMLDivElement | null>(null)
   const inst = useRef<FgInstance | null>(null)
   /** The objects handed to the 3D engine; it writes x/y/z back onto them in place. */
@@ -64,7 +72,7 @@ export default function ThreeView({ kg, onSelect, insetRight, focus }: Props) {
         const g = ForceGraph3D()(el)
         // Fresh objects, kept in a ref: the engine writes x/y/z back onto them in place, and
         // that is how "fly to this node" finds where it ended up.
-        const fresh = toForceGraph(kg)
+        const fresh = toForceGraph(kg, hidden)
         data.current = fresh
         g.width(el.clientWidth)
           .height(el.clientHeight)
@@ -73,9 +81,15 @@ export default function ThreeView({ kg, onSelect, insetRight, focus }: Props) {
           .nodeLabel((n) => n.label ?? n.id ?? '')
           .nodeColor((n) => n.color ?? '#7b9ecb')
           .nodeVal((n) => n.size ?? 2)
-          // Power as line width, and an arrowhead only where the relation has a direction.
-          .linkWidth((l) => Math.min(6, Math.max(0.35, 1.4 * (l.power ?? 1))))
-          .linkDirectionalArrowLength((l) => (l.dir ? 3 : 0))
+          // The same reading as 2D, from the same document: width from `power`, the pattern
+          // from `style`, a head only where a direction was asked for. 3D can draw dashes
+          // natively, which is why this view has no overlay and the 2D one does.
+          .linkWidth((l) => edgePx(l as unknown as Record<string, unknown>, edgeScale))
+          .linkColor((l) => l.color ?? '#525c6b')
+          .linkLineDash((l) => edgeDash(l as unknown as Record<string, unknown>) ?? null)
+          .linkDirectionalArrowLength((l) =>
+            edgeShape(l as unknown as Record<string, unknown>, arrows) === 'line' ? 0 : 3,
+          )
           .onNodeClick((n) => selectRef.current(n.id ?? null))
           .onEngineStop(() => g.zoomToFit(600, 40))
           .graphData(fresh)
@@ -91,7 +105,7 @@ export default function ThreeView({ kg, onSelect, insetRight, focus }: Props) {
       inst.current = null
       data.current = null
     }
-  }, [kg])
+  }, [kg, hidden, arrows, edgeScale])
 
   // Follow a connection in 3D: park the camera along the line from the origin to the node, the
   // standard way to look at one thing without losing where it is.

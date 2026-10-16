@@ -18,6 +18,27 @@ export type KgMeta = {
   requires?: { skills?: string[]; plugins?: string[]; tools?: string[] }
   /** How importance was measured for this graph. See KgWeight. */
   weight?: KgWeight
+  /** Per-graph visual decisions, so taste is data and not a hardcode. See KgVisuals. */
+  visuals?: KgVisuals
+}
+
+/**
+ * How this graph wants to look. The app carries defaults; a document overrides them, which is
+ * the difference between "the viewer draws arrows" and "this graph draws arrows".
+ */
+export type KgVisuals = {
+  /** Draw a head on a directed relation by default. Off unless asked for. */
+  arrows?: boolean
+  /** Multiply every edge's width. */
+  edge_width?: number
+  /** Multiply every node's radius. */
+  node_scale?: number
+  /** Draw a ring around a node that has hidden nodes collapsed inside it. */
+  halo?: boolean
+  /** The most nodes this graph is known to be drawable at, on the host that measured it. */
+  max_nodes?: number
+  /** A note about the measurement, shown with the banner. */
+  max_nodes_note?: string
 }
 
 /**
@@ -122,9 +143,11 @@ const WEIGHT_MAX_PX = 28
 /** An edge's power: 1 is normal. This is how wide, and how faint, that makes it. */
 export const POWER_DEFAULT = 1
 const POWER_WEAK = 0.5
-const POWER_MIN_PX = 0.35
-const POWER_MAX_PX = 6
 const POWER_WEAK_COLOR = 'rgba(82, 92, 107, 0.4)'
+
+/** Edge width in px, clamped — the same numbers `edgePx` uses, shared with the overlay. */
+export const EDGE_MIN_PX = 0.35
+export const EDGE_MAX_PX = 6
 
 const clamp = (lo: number, hi: number, v: number) => Math.min(hi, Math.max(lo, v))
 
@@ -139,7 +162,6 @@ const pxFromWeight = (score: number) =>
   clamp(WEIGHT_MIN_PX, WEIGHT_MAX_PX, WEIGHT_SCALE * Math.sqrt(Math.max(0, score)))
 /** A `size` written by hand is a weight too; this is the older, direct mapping. */
 const pxFromSize = (s: number) => Math.min(30, 3 + s * 1.6)
-const pxFromPower = (p: number) => clamp(POWER_MIN_PX, POWER_MAX_PX, 1.4 * p)
 
 const num = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) ? v : undefined
@@ -276,12 +298,11 @@ function applyVisuals(g: Graph, meta: KgMeta): void {
   g.forEachEdge((key, a) => {
     const p = powerOf(a)
     g.setEdgeAttribute(key, 'power', p)
-    g.setEdgeAttribute(key, 'size', pxFromPower(p))
+    // An edge with no colour of its own keeps the viewer's default; a weak relation is dimmed
+    // so that texture stays texture.
     if (p < POWER_WEAK && typeof a.color !== 'string') {
       g.setEdgeAttribute(key, 'color', POWER_WEAK_COLOR)
     }
-    // An arrow says the relation has a direction; `dir` said so and nothing drew it.
-    if (a.dir === 'in' || a.dir === 'out') g.setEdgeAttribute(key, 'type', 'arrow')
   })
 }
 
@@ -295,6 +316,66 @@ const RESERVED_NODE_KEYS = new Set([
 ])
 
 const RESERVED_EDGE_KEYS = new Set(['from', 'to'])
+
+/**
+ * What a relation looks like, said in the document.
+ *
+ * `style` is the edge's appearance, separate from what it means: the stroke (`solid`, `dashed`,
+ * `dotted`) and the shape (`arrow`, `double`, `clamped`, `rectangle`, `triangle`), as
+ * space-separated words — `"dotted arrow"` is a valid style and reads the way a person would say
+ * it. Anything unrecognised is ignored rather than fatal: a graph from a future version still
+ * draws, and the engine's `validate` is where an unknown word gets reported.
+ *
+ * `color` is the edge's own colour, `power` its emphasis (1 = an ordinary relation), and `dash`
+ * an explicit pattern ("6 4") for when the three named strokes are not the one you want.
+ */
+const EDGE_STROKES: Record<string, number[]> = {
+  solid: [],
+  dashed: [6, 4],
+  dotted: [1.5, 3],
+}
+const EDGE_SHAPES = new Set(['arrow', 'double', 'clamped', 'rectangle', 'triangle'])
+
+function styleWords(v: unknown): string[] {
+  return typeof v === 'string' ? v.toLowerCase().split(/[\s,]+/).filter(Boolean) : []
+}
+
+function dashPattern(v: unknown): number[] | undefined {
+  if (Array.isArray(v)) {
+    const nums = v.map((x) => num(x)).filter((x): x is number => x !== undefined)
+    if (nums.length) return nums.length === 1 ? [nums[0], nums[0]] : nums
+    return undefined
+  }
+  if (typeof v === 'string') {
+    const nums = v.split(/[\s,]+/).map(Number).filter((x) => Number.isFinite(x) && x >= 0)
+    if (nums.length) return nums.length === 1 ? [nums[0], nums[0]] : nums
+  }
+  return undefined
+}
+
+/** The dash to draw with, or none: the named stroke first, then the explicit pattern. */
+export function edgeDash(a: Record<string, unknown>): number[] | undefined {
+  const explicit = dashPattern(a.dash)
+  if (explicit) return explicit
+  for (const w of styleWords(a.style)) if (EDGE_STROKES[w]?.length) return EDGE_STROKES[w]
+  return undefined
+}
+
+/** The shape to draw: a named one from the document, else the direction, else a plain line. */
+export function edgeShape(a: Record<string, unknown>, arrows: boolean): string {
+  for (const w of styleWords(a.style)) if (EDGE_SHAPES.has(w)) return w === 'double' ? 'double' : w
+  if (!arrows) return 'line'
+  if (a.dir === 'both') return 'double'
+  if (a.dir === 'in' || a.dir === 'out') return 'arrow'
+  return 'line'
+}
+
+/** sigma draws edges in pixels; `power` is emphasis and `width` beats it when stated. */
+export function edgePx(a: Record<string, unknown>, scale = 1): number {
+  const explicit = num(a.width)
+  const px = explicit !== undefined ? explicit : 1.4 * powerOf(a) * scale
+  return clamp(EDGE_MIN_PX, EDGE_MAX_PX, px)
+}
 
 /** kg/1 JSON -> the single graphology graph. */
 export function toKg(doc: KgJson): Kg {
@@ -360,7 +441,15 @@ export function toKg(doc: KgJson): Kg {
       attrs[k] = v
     }
     try {
-      graph.addEdgeWithKey(`e${i++}`, e.from, e.to, attrs)
+      // `dir: out` means the arrow points at `from`, and a drawn edge can only point at its own
+      // target — so the edge is stored reversed and the authored ends are kept beside it, which
+      // is what the panel reads. Without this, `out` was a no-op.
+      const out = str(e.dir) === 'out'
+      if (out) {
+        attrs.authored_from = e.from
+        attrs.authored_to = e.to
+      }
+      graph.addEdgeWithKey(`e${i++}`, out ? e.to : e.from, out ? e.from : e.to, attrs)
     } catch {
       // The document is data, not a promise: a rejected edge is skipped, not fatal.
     }
@@ -423,4 +512,30 @@ export async function loadKg(): Promise<Kg> {
     // expected under file://
   }
   return emptyKg()
+}
+
+/**
+ * The notes written beside the graph, inlined into the page by the engine — absent for a graph
+ * that has none, and absent is fine: a note is optional, and a node without one is still a node.
+ *
+ * They are inlined rather than fetched because the page is opened over `file://`, where a
+ * browser refuses to read a file next to it. Same reason the graph itself is inlined.
+ */
+export async function loadDocs(): Promise<Record<string, string>> {
+  const el = document.getElementById('kg-docs')
+  if (!el) return {}
+  try {
+    const v = JSON.parse(el.textContent || '{}') as unknown
+    return v && typeof v === 'object' ? (v as Record<string, string>) : {}
+  } catch {
+    return {}
+  }
+}
+
+/** How much a node is worth, as the data layer resolved it — the mass a ring stands for. */
+export function weightOf(kg: Kg, id: string): number {
+  const a = kg.graph.getNodeAttributes(id) as { weight?: number; px?: number }
+  if (typeof a.weight === 'number') return a.weight
+  if (typeof a.px === 'number') return a.px
+  return 1
 }

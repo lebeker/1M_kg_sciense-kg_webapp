@@ -3,20 +3,57 @@
   "title": "Research field map",
   "purpose": "Map a research field so it can be looked at: what the field is made of, who works on it, and where the applied work is.",
   "keywords": [
-    "research", "field", "map", "paper", "papers", "article", "articles", "publication",
-    "publications", "preprint", "literature", "science", "scientific", "researcher",
-    "researchers", "scientist", "scientists", "who works on", "lab", "labs", "university",
-    "institution", "company", "companies", "startup", "graph", "knowledge graph",
-    "literature review", "longevity", "biotech", "cryogenics", "brain", "drug", "clinical",
+    "research",
+    "field",
+    "map",
+    "paper",
+    "papers",
+    "article",
+    "articles",
+    "publication",
+    "publications",
+    "preprint",
+    "literature",
+    "science",
+    "scientific",
+    "researcher",
+    "researchers",
+    "scientist",
+    "scientists",
+    "who works on",
+    "lab",
+    "labs",
+    "university",
+    "institution",
+    "company",
+    "companies",
+    "startup",
+    "graph",
+    "knowledge graph",
+    "literature review",
+    "longevity",
+    "biotech",
+    "cryogenics",
+    "brain",
+    "drug",
+    "clinical",
     "trial"
   ],
   "requires": {
-    "skills": ["kg"],
+    "skills": [
+      "kg"
+    ],
     "plugins": [],
-    "tools": ["openalex"]
+    "tools": [
+      "openalex"
+    ]
   },
   "recommends": {
-    "tools": ["a web-search tool", "crossref", "arxiv"]
+    "tools": [
+      "a web-search tool",
+      "crossref",
+      "arxiv"
+    ]
   },
   "tool_notes": {
     "openalex": "works, authors, institutions and concepts in one place, free and without a key — it carries most of the skeleton",
@@ -25,26 +62,83 @@
     "a web-search tool": "the only way to evidence a company — no free API lists what a private company is working on"
   },
   "kinds": [
-    { "kind": "publication", "color": "#cdd9e5", "meaning": "a work — a paper, a preprint, a trial report. The thing a DOI identifies. Carries doi, and link when it has one", "keywords": "paper, article, preprint, study, work, DOI" },
-    { "kind": "researcher", "color": "#d47fa6", "meaning": "a person who does the work" },
-    { "kind": "subject", "color": "#7b9ecb", "meaning": "a subject, question or mechanism the field is about" },
-    { "kind": "lab", "color": "#93c47d", "meaning": "a working group, usually inside an institution" },
-    { "kind": "institution", "color": "#9aa0a6", "meaning": "a university, hospital or public body" },
-    { "kind": "company", "color": "#f5a623", "meaning": "a company, and what it is building" }
+    {
+      "kind": "publication",
+      "color": "#cdd9e5",
+      "meaning": "a work — a paper, a preprint, a trial report. The thing a DOI identifies. Carries doi, and link when it has one",
+      "keywords": "paper, article, preprint, study, work, DOI"
+    },
+    {
+      "kind": "researcher",
+      "color": "#d47fa6",
+      "meaning": "a person who does the work"
+    },
+    {
+      "kind": "subject",
+      "color": "#7b9ecb",
+      "meaning": "a subject, question or mechanism the field is about"
+    },
+    {
+      "kind": "lab",
+      "color": "#93c47d",
+      "meaning": "a working group, usually inside an institution"
+    },
+    {
+      "kind": "institution",
+      "color": "#9aa0a6",
+      "meaning": "a university, hospital or public body"
+    },
+    {
+      "kind": "company",
+      "color": "#f5a623",
+      "meaning": "a company, and what it is building"
+    }
   ],
   "kind_notes": {
     "one word per thing": "`publication` covers papers, preprints and trial reports — a kind is what a node IS, and the everyday words are keywords, not kinds. A graph may still split them (kind `preprint`) if it needs to; every kind renders, and a kind this app has never heard of gets its own colour.",
     "older names": "graphs built before this vocabulary may say `scientist` and `concept`; they render exactly the same way, with hash-derived colours. Nothing has to be migrated."
   },
   "edges": [
-    { "pattern": "researcher → publication", "label": "authored", "meaning": "the main link of a research field. --time the year" },
-    { "pattern": "publication → subject", "label": "is about", "meaning": "what the work addresses" },
-    { "pattern": "researcher → institution", "label": "works at", "meaning": "affiliation" },
-    { "pattern": "institution → subject", "label": "research on", "meaning": "a body's stated interest" },
-    { "pattern": "company → subject", "label": "targets", "meaning": "what a company's work addresses, --dir in" },
-    { "pattern": "publication → publication", "label": "cites", "meaning": "the citation skeleton: --from the citing work, --to the cited one, --dir in" },
-    { "pattern": "publication → publication", "label": "co-cited in N works", "meaning": "two works cited together. Weak by nature: --power 0.05 --set cocited=N, so the count is data and the relation is drawn thin" },
-    { "pattern": "company → company", "label": "collaborates on <subject>", "meaning": "two organisations on the same subject — this makes a cluster legible instead of a fan of lines into one dot" }
+    {
+      "pattern": "researcher → publication",
+      "label": "authored",
+      "meaning": "the main link of a research field. --time the year"
+    },
+    {
+      "pattern": "publication → subject",
+      "label": "is about",
+      "meaning": "what the work addresses"
+    },
+    {
+      "pattern": "researcher → institution",
+      "label": "works at",
+      "meaning": "affiliation"
+    },
+    {
+      "pattern": "institution → subject",
+      "label": "research on",
+      "meaning": "a body's stated interest"
+    },
+    {
+      "pattern": "company → subject",
+      "label": "targets",
+      "meaning": "what a company's work addresses, --dir in"
+    },
+    {
+      "pattern": "publication → publication",
+      "label": "cites",
+      "meaning": "the citation skeleton: --from the citing work, --to the cited one, --dir in. Add --style arrow when the map is meant to be read as a citation graph, and `visuals --arrows on` to do it for every directed relation in the graph at once"
+    },
+    {
+      "pattern": "publication → publication",
+      "label": "co-cited in N works",
+      "meaning": "two works cited together. Weak by nature, and it should *look* weak: --power 0.05 --style dashed --set cocited=N. The count is data (shown in the panel), the dash is the reading (a broken line nobody mistakes for structure)"
+    },
+    {
+      "pattern": "company → company",
+      "label": "collaborates on <subject>",
+      "meaning": "two organisations on the same subject — this makes a cluster legible instead of a fan of lines into one dot"
+    }
   ],
   "alternative": {
     "a work as an edge": "a graph that prefers it may keep putting the work in the edge label (researcher → subject, label = the title, --time the year) instead of promoting it to a `publication` node. Both render; the node form carries a doi and can be co-cited, which the edge form cannot."
@@ -57,9 +151,31 @@
     "level": "a node's position on the third axis (foundational low, abstract high). The 3D view is the only place it moves anything; a 2D map laid out by rings or by force ignores it.",
     "placement": "`ring` puts a node on a concentric ring — 0 is the centre, higher numbers are further out — and `x`,`y` put it exactly where it is told. A graph with a ring on any node is laid out as rings; a graph where every node has `x`,`y` is used as given; otherwise the viewer lays it out itself.",
     "default rings": "organisations 0, researchers 1, publications 2, subjects 3 — which is the ask 'companies in the centre, researchers in the middle, subjects on the periphery' expressed as data.",
-    "following a graph": "the panel lists a node's connections with the power and properties of each relation, strongest first. Clicking one opens that node and puts it in the middle of the view, so a graph can be walked rather than only looked at."
+    "following a graph": "the panel lists a node's connections with the power and properties of each relation, strongest first. Clicking one opens that node and puts it in the middle of the view, so a graph can be walked rather than only looked at.",
+    "what the panel and canvas do together": "pointing at a relation in the panel highlights that line on the canvas (including dashed ones, which are drawn on the overlay); the connections block folds by relation word, and a group can be collapsed into its endpoint node, which then wears a ring sized by the mass it hides. What is hidden is always countable from the screen — a collapsed map that does not say what it hides is a lie about the map."
   },
   "layout": {
     "note": "Companies and institutions at the centre, researchers in the middle, subjects on the periphery. With authored x,y the viewer uses them as given; with `ring` it builds the rings; with neither it lays the graph out itself."
+  },
+  "edge_appearance": {
+    "style": "space-separated words: the stroke and/or the shape. Strokes: `solid`, `dashed`, `dotted`. Shapes: `arrow`, `double`, `clamped`, `rectangle`, `triangle`. So `--style \"dotted arrow\"` is valid and reads the way somebody would say it. An unknown word is refused by the engine rather than stored, because a style the renderer ignores is a silent loss of meaning.",
+    "color": "`--color '#8fa3c8'` — this relation's own colour. A graph can say 'those edges are blue and dotted' and be obeyed; colours are also what make two relations of the same pair distinguishable in the panel.",
+    "dash": "`--dash \"6 4\"` — an explicit pattern, for when solid/dashed/dotted is not the one you mean. Dashes are drawn on a 2D layer over the WebGL canvas (sigma's programs cannot dash), so they cost nothing to add and are drawn in any pattern or colour.",
+    "width": "`--width 2` — an explicit line width in px, when `power` is not the right control.",
+    "arrows off by default": "a directed relation (`dir: in`) is drawn as a plain line unless the graph asks for heads: `visuals --arrows on` for the whole graph, or `--style arrow` on one edge. A citation map usually wants them; a field map usually does not.",
+    "where it is decided": "per edge in the document, and per graph in `meta.visuals` (arrows, edge_width, node_scale, halo). The app has defaults; a document overrides them. Nothing about appearance needs a code change."
+  },
+  "notes": {
+    "what they are": "the long form of a node's description, one markdown file per node (or for the subject as a whole), in a `docs/` folder beside the graph document. They are the half of a survey a graph cannot carry: what a thing is, why it matters here, and where the claim comes from.",
+    "how to write one": "`kg.py note --graph <id> --node <node>` creates `docs/<slug>.md` from a skeleton and points the node at it; `note --graph <id>` does the same for the subject's overview note, which is the draft of whatever is being written about this map.",
+    "how they are read": "they are inlined into the rendered page (a file opened from `file://` cannot fetch its neighbours) and appear in a second panel, opened from a node's 'read the note' button or the header's 'notes' button.",
+    "how they are written back": "the panel edits a copy and can download or copy it; the page cannot write to the reader's disk from `file://`. The file's owner is the agent (or the person) working in the folder — which is also why every note is plain markdown in a predictable place.",
+    "why they are not optional for bodies": "a `subject`/`lab`/`institution`/`company` node must carry at least one sentence from the moment it is created (`add-node` refuses without it), and `review` lists the bodies whose sentence predates the connections around them, because a description of a concept is a claim about a field and the field keeps moving."
+  },
+  "scale": {
+    "the budget": "how many nodes a host can actually draw is measured in the browser, not claimed in the file: a graph over ~600 nodes is revealed in growing steps while frame times are watched, and the count that held 30fps becomes the budget for that host. `kg.py capacity --nodes N` can record one for a machine that cannot measure itself.",
+    "what happens past it": "nothing is deleted and nothing is refused: the viewer collapses the smallest, weakest clusters (per concept) until it fits, draws a ring around each node that has nodes hidden inside it — thicker with the mass hidden — and says in a banner how many nodes are collapsed, with a button to expand anyway.",
+    "why not in the file": "a node budget is a fact about a machine. The document travels between machines that are not equally fast, so the number is stored per host (browser storage) and only the *fallback* lives in the document.",
+    "10k articles": "the graph format does not care: nodes and edges are arrays. What it costs is the source, not the store — a 10k-work OpenAlex pull is roughly 10k credits (~$1 on the metered plan) per refresh, and other providers (Crossref, arXiv, PubMed, Semantic Scholar, CORE, DOAJ) cover parts of the same ground for free or nearly. See the skill's `references/providers.md` for who provides what."
   }
 }
