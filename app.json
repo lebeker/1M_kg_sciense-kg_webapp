@@ -42,17 +42,22 @@
     { "pattern": "researcher → institution", "label": "works at", "meaning": "affiliation" },
     { "pattern": "institution → subject", "label": "research on", "meaning": "a body's stated interest" },
     { "pattern": "company → subject", "label": "targets", "meaning": "what a company's work addresses, --dir in" },
-    { "pattern": "publication → publication", "label": "co-cited in N works", "meaning": "two works cited together, --weight the measured count" },
+    { "pattern": "publication → publication", "label": "cites", "meaning": "the citation skeleton: --from the citing work, --to the cited one, --dir in" },
+    { "pattern": "publication → publication", "label": "co-cited in N works", "meaning": "two works cited together. Weak by nature: --power 0.05 --set cocited=N, so the count is data and the relation is drawn thin" },
     { "pattern": "company → company", "label": "collaborates on <subject>", "meaning": "two organisations on the same subject — this makes a cluster legible instead of a fan of lines into one dot" }
   ],
   "alternative": {
     "a work as an edge": "a graph that prefers it may keep putting the work in the edge label (researcher → subject, label = the title, --time the year) instead of promoting it to a `publication` node. Both render; the node form carries a doi and can be co-cited, which the edge form cannot."
   },
   "visuals": {
-    "node size": "`size` is a weight from 1 to 10, and it may be set directly (`--set size=6`) or left out — a node with no size is drawn by how connected it is, so the map shows importance with no editing. Setting it is the direct control.",
-    "edge power": "`weight` is an edge's strength as a number: `--weight 66` on a co-citation edge is the measured count of shared citers. The viewer draws it as line thickness, so the strongest relations read first.",
+    "node weight": "`weight` on a node is what it is worth on this map, and how it was measured is stated once for the whole graph in `meta.weight.metric` — \"relevant papers\", \"thousands of citations (OpenAlex)\". Every panel says which of the two a node's number came from: the document, or the graph's own connections. Change the metric and the sizes change; nothing else has to.",
+    "node size": "with no `weight` and no `size`, a node is drawn from ½ × the summed power of its edges × a multiplier for its kind — publication 0.1, researcher 1, lab/institution/company 3, subject 10 — so a map is readable before anyone tunes it. Both halves are the graph's to change: `meta.weight.kind_multipliers`, or `weigh --mul subject=20`. `--set size=6` sets a node's weight by hand in the same units.",
+    "edge power": "`power` is an edge's strength, where **1 is a normal relation**: `--set power=0.05` on a co-citation says it is texture, not structure, and it is drawn as a hairline at half opacity. A measured number is a different thing — `--set cocited=66` shows 66 in the panel and leaves the line as thin as it should be.",
+    "direction": "`dir: in` puts an arrowhead at the `to` end, so a citation or a target reads as pointing at what it acts on.",
+    "level": "a node's position on the third axis (foundational low, abstract high). The 3D view is the only place it moves anything; a 2D map laid out by rings or by force ignores it.",
     "placement": "`ring` puts a node on a concentric ring — 0 is the centre, higher numbers are further out — and `x`,`y` put it exactly where it is told. A graph with a ring on any node is laid out as rings; a graph where every node has `x`,`y` is used as given; otherwise the viewer lays it out itself.",
-    "default rings": "organisations 0, researchers 1, publications 2, subjects 3 — which is the ask 'companies in the centre, researchers in the middle, subjects on the periphery' expressed as data."
+    "default rings": "organisations 0, researchers 1, publications 2, subjects 3 — which is the ask 'companies in the centre, researchers in the middle, subjects on the periphery' expressed as data.",
+    "following a graph": "the panel lists a node's connections with the power and properties of each relation, strongest first. Clicking one opens that node and puts it in the middle of the view, so a graph can be walked rather than only looked at."
   },
   "layout": {
     "note": "Companies and institutions at the centre, researchers in the middle, subjects on the periphery. With authored x,y the viewer uses them as given; with `ring` it builds the rings; with neither it lays the graph out itself."

@@ -16,6 +16,21 @@ export type KgMeta = {
   app_url?: string
   /** What the graph needs beyond the document itself. */
   requires?: { skills?: string[]; plugins?: string[]; tools?: string[] }
+  /** How importance was measured for this graph. See KgWeight. */
+  weight?: KgWeight
+}
+
+/**
+ * How node importance was measured. The document gets to say, because "who matters most in this
+ * field" is a claim about the world, and a claim should travel with its method: weighting a map
+ * by relevant papers and weighting it by grant money are different graphs of the same field.
+ */
+export type KgWeight = {
+  /** What the numbers measure, in words: "relevant papers", "grant funding (USD)". */
+  metric?: string
+  /** kind -> what one unit of a node's connections is worth for that kind. */
+  kind_multipliers?: Record<string, number>
+  note?: string
 }
 
 export type KgNode = {
@@ -46,6 +61,13 @@ export type KgEdge = {
   to: string
   label?: string
   dir?: string
+  /**
+   * An edge's power: how much this relation weighs, where 1 is a normal relation and a small
+   * number is one that barely counts. It is a *display* multiplier, not a measurement — a count
+   * (citations, co-citation hits) is a property of its own and is shown in the panel. `weight`
+   * is read as a synonym so graphs written before `power` existed keep working.
+   */
+  power?: number
   /** When the edge is a piece of work (a paper, a trial), its date. */
   time?: string | number
   link?: string
@@ -76,6 +98,48 @@ const STARTER_PALETTE: Record<string, string> = {
   institution: '#9aa0a6',
   company: '#f5a623',
 }
+
+/**
+ * Importance, when the document does not state it.
+ *
+ * The score is **half the sum of the powers of the edges touching a node** — one edge of power 1
+ * counts 0.5 — times a multiplier for its kind, because a paper is a small element of a field
+ * map and a concept is what the map is about. Both halves belong to the document: `meta.weight`
+ * carries the metric and the multipliers, and `size` on a node overrides the result outright.
+ * So "weigh this field by grant money instead of by papers" is a change of data.
+ */
+const DEFAULT_KIND_MULTIPLIERS: Record<string, number> = {
+  publication: 0.1, paper: 0.1, article: 0.1,
+  researcher: 1, scientist: 1, person: 1,
+  lab: 3, institution: 3, company: 3,
+  subject: 10, concept: 10,
+}
+/** px = SCALE * sqrt(score): a hundredfold score is a tenfold circle, not a hundredfold one. */
+const WEIGHT_SCALE = 2.5
+const WEIGHT_MIN_PX = 1.5
+const WEIGHT_MAX_PX = 28
+
+/** An edge's power: 1 is normal. This is how wide, and how faint, that makes it. */
+export const POWER_DEFAULT = 1
+const POWER_WEAK = 0.5
+const POWER_MIN_PX = 0.35
+const POWER_MAX_PX = 6
+const POWER_WEAK_COLOR = 'rgba(82, 92, 107, 0.4)'
+
+const clamp = (lo: number, hi: number, v: number) => Math.min(hi, Math.max(lo, v))
+
+/** What an edge says its power is, defaulting to 1 — `weight` is the older spelling. */
+export function powerOf(attrs: Record<string, unknown>): number {
+  const p = num(attrs.power) ?? num(attrs.weight)
+  return p === undefined ? POWER_DEFAULT : p
+}
+
+/** The score in `weight` is abstract; sigma wants pixels. */
+const pxFromWeight = (score: number) =>
+  clamp(WEIGHT_MIN_PX, WEIGHT_MAX_PX, WEIGHT_SCALE * Math.sqrt(Math.max(0, score)))
+/** A `size` written by hand is a weight too; this is the older, direct mapping. */
+const pxFromSize = (s: number) => Math.min(30, 3 + s * 1.6)
+const pxFromPower = (p: number) => clamp(POWER_MIN_PX, POWER_MAX_PX, 1.4 * p)
 
 const num = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) ? v : undefined
@@ -177,23 +241,47 @@ function layoutRings(g: Graph): void {
 }
 
 /**
- * What a node and an edge look like when the author did not say.
+ * What a node and an edge is worth on screen when the author did not say.
  *
- * `size` and `weight` are the direct controls: set them and they are used as given. Leave them
- * out and the graph still reads — a node is drawn by how connected it is, an edge by how strong
- * it is. That is the difference between a picture that needs editing to be legible and one that
- * is legible on arrival.
+ * A node's `weight` is the document's if it carries one, and otherwise half the sum of the
+ * powers of its edges times the multiplier for its kind — so a map shows importance with no
+ * editing, and a map that has *measured* importance shows that instead. `size` overrides both.
+ * An edge's `power` becomes its width, and a relation below half power is drawn as a hairline at
+ * low opacity, because "these two are barely related" should not look like "these two are the
+ * same thing".
  */
-function applyVisuals(g: Graph): void {
+function applyVisuals(g: Graph, meta: KgMeta): void {
+  const multipliers = { ...DEFAULT_KIND_MULTIPLIERS, ...(meta.weight?.kind_multipliers ?? {}) }
+  // Declaring a metric is a statement about the graph — "this is weighted by relevant papers" —
+  // so it is what the drawing follows. Per-node `size` still wins in a graph that declares
+  // nothing, which is how a hand-tuned map keeps its emphasis.
+  const declared = meta.weight !== undefined && Object.keys(meta.weight).length > 0
   g.forEachNode((id, a) => {
-    if (num(a.size) !== undefined) return
-    g.setNodeAttribute(id, 'size', 1 + Math.log2(1 + g.degree(id)))
+    let sum = 0
+    g.forEachEdge(id, (_key, e) => {
+      sum += powerOf(e as Record<string, unknown>)
+    })
+    const authored = num(a.weight)
+    const multipliersFor = num(multipliers[str(a.kind) ?? 'unknown'])
+    const score = authored ?? 0.5 * sum * (multipliersFor ?? 1)
+    g.setNodeAttribute(id, 'weight', Math.round(score * 1000) / 1000)
+    g.setNodeAttribute(id, 'weight_from', authored === undefined ? 'connections' : 'document')
+    const explicit = num(a.size)
+    g.setNodeAttribute(
+      id,
+      'px',
+      !declared && explicit !== undefined ? pxFromSize(explicit) : pxFromWeight(score),
+    )
   })
   g.forEachEdge((key, a) => {
-    const w = num(a.weight)
-    if (w === undefined || w <= 1) return
-    // Line thickness, so the strongest relations read first.
-    g.setEdgeAttribute(key, 'size', Math.min(9, 1 + Math.log2(w)))
+    const p = powerOf(a)
+    g.setEdgeAttribute(key, 'power', p)
+    g.setEdgeAttribute(key, 'size', pxFromPower(p))
+    if (p < POWER_WEAK && typeof a.color !== 'string') {
+      g.setEdgeAttribute(key, 'color', POWER_WEAK_COLOR)
+    }
+    // An arrow says the relation has a direction; `dir` said so and nothing drew it.
+    if (a.dir === 'in' || a.dir === 'out') g.setEdgeAttribute(key, 'type', 'arrow')
   })
 }
 
@@ -278,18 +366,19 @@ export function toKg(doc: KgJson): Kg {
     }
   }
 
-  // Sizes and edge thickness before the layout, because the layout can be told to respect them.
-  applyVisuals(graph)
+  // What things are worth before the layout runs, because the layout can be told to respect it:
+  // node radius, edge width, and the weight every node's importance is recorded in.
+  applyVisuals(graph, meta)
 
   const kg: Kg = { graph, meta, layout: 'authored' }
   kg.layout = ensurePositions(kg)
   return kg
 }
 
-/** sigma draws `size` in pixels; the document's size is an abstract weight. */
+/** sigma draws `size` in pixels; a document that set one by hand said "this weight". */
 export function pxSize(raw: unknown): number {
   const s = num(raw) ?? 2
-  return Math.min(30, 3 + s * 1.6)
+  return pxFromSize(s)
 }
 
 export type KindCount = { kind: string; color: string; count: number }

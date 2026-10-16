@@ -9,13 +9,14 @@ export type ForceNode = {
   label: string
   kind: string
   color: string
+  /** Radius in pixels, already resolved from `weight`/`size` by the data layer. */
   size: number
   x?: number
   y?: number
   z?: number
 }
 
-export type ForceLink = { source: string; target: string; label?: string }
+export type ForceLink = { source: string; target: string; label?: string; power: number; dir?: string }
 
 export type ForceGraphData = { nodes: ForceNode[]; links: ForceLink[] }
 
@@ -37,7 +38,7 @@ export function toForceGraph(kg: Kg, zScale = 60): ForceGraphData {
       label: typeof a.label === 'string' ? a.label : id,
       kind: typeof a.kind === 'string' ? a.kind : 'unknown',
       color: typeof a.color === 'string' ? a.color : '#7b9ecb',
-      size: typeof a.size === 'number' ? a.size : 2,
+      size: typeof a.px === 'number' ? a.px : typeof a.size === 'number' ? a.size : 2,
       z: typeof a.level === 'number' ? -a.level * zScale : 0,
     }
     if (typeof a.x === 'number') node.x = a.x
@@ -47,8 +48,13 @@ export function toForceGraph(kg: Kg, zScale = 60): ForceGraphData {
 
   const links: ForceLink[] = []
   kg.graph.forEachEdge((_key, a, source, target) => {
-    const link: ForceLink = { source, target }
+    const link: ForceLink = {
+      source,
+      target,
+      power: typeof a.power === 'number' ? a.power : 1,
+    }
     if (typeof a.label === 'string') link.label = a.label
+    if (typeof a.dir === 'string') link.dir = a.dir
     links.push(link)
   })
 
