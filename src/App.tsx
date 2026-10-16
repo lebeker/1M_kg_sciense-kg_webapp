@@ -103,6 +103,8 @@ export default function App() {
   const aggRef = useRef<Set<string>>(new Set())
   /** Bumped whenever the drawn graph changes without the document changing. */
   const [graphVersion, setGraphVersion] = useState(0)
+  /** What the button would fold away, worked out when the pointer is on it. */
+  const [preview, setPreview] = useState<number | null>(null)
   const [folded, setFolded] = useState<Set<string>>(new Set())
   /** The node budget measured on this host, and whether the reader has insisted on more. */
   const [budget, setBudget] = useState<number | null>(null)
@@ -829,11 +831,17 @@ export default function App() {
                     <button
                       className="tiny"
                       disabled={!g.hideable && !g.conns.some((c) => hidden.has(c.other))}
+                      onMouseEnter={() => {
+                        if (!selected) return
+                        setPreview(descend(g.conns.map((c) => c.other), selected).size)
+                      }}
+                      onMouseLeave={() => setPreview(null)}
                       title={
                         g.conns.some((c) => hidden.has(c.other))
                           ? 'bring back what this group put away'
                           : g.hideable
-                            ? 'hide what hangs below these nodes; the ring keeps count'
+                            ? `fold what hangs below these nodes into this one, and count what it ` +
+                              `reaches${preview === null ? '' : ` — ${preview} node${preview === 1 ? '' : 's'}`}`
                             : 'nothing sits below these — a collapse descends from the thing above them'
                       }
                       onClick={() =>
