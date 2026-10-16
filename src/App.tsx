@@ -271,25 +271,59 @@ export default function App() {
    * therefore hides nothing at all, which is the honest answer rather than a special case.
    */
   const descend = useCallback(
-    (ids: string[], fromKind?: string): Set<string> => {
+    (ids: string[], from: string | null): Set<string> => {
       const out = new Set<string>()
-      if (!kg) return out
-      // The level we start from is the node the collapse was asked for: nothing at or above it is
-      // ours to hide. That one rule is what makes the descent behave the way a reader expects — a
-      // company drops its people and their papers, while neither the concepts those papers are
-      // about nor a partner company is touched.
-      const rank = kindRank(kg, fromKind)
+      if (!kg || !from || !kg.graph.hasNode(from)) return out
+      const ceiling = kindRank(kg, kg.graph.getNodeAttribute(from, 'kind') as string)
+      const rankOf = (id: string) =>
+        kg.graph.hasNode(id) ? kindRank(kg, kg.graph.getNodeAttribute(id, 'kind') as string) : 0
+      // A graph may say which relations mean *belongs to* (`meta.visuals.hierarchy`). When it
+      // does, the descent crosses only those: a citation into a company's paper is a fact about
+      // the field, not a membership. With none declared it may cross any relation, and the test
+      // below is what keeps the map whole either way.
+      const declared = (kg.meta?.visuals as { hierarchy?: unknown } | undefined)?.hierarchy
+      const rels = Array.isArray(declared) ? new Set(declared.map(String)) : null
+
+      // 1. Everything below the level we started from, reachable from what was asked for.
       const frontier = [...ids]
       while (frontier.length) {
         const id = frontier.pop() as string
-        if (typeof id !== 'string' || !kg.graph.hasNode(id) || out.has(id)) continue
-        if (kindRank(kg, kg.graph.getNodeAttribute(id, 'kind') as string) >= rank) continue
+        if (typeof id !== 'string' || out.has(id) || id === from || !kg.graph.hasNode(id)) continue
+        if (rankOf(id) >= ceiling) continue
         out.add(id)
         kg.graph.forEachEdge(id, (_key, a, src, tgt) => {
           if ((a as { agg?: boolean }).agg) return
+          if (rels && !rels.has(String((a as { label?: unknown }).label ?? ''))) return
           const other = src === id ? tgt : src
           if (!out.has(other)) frontier.push(other)
         })
+      }
+
+      // 2. But nothing that is still held by the visible map can be folded away. A paper shared
+      // with another lab, a scientist who also works somewhere else: those are not this node's to
+      // hide. Without this, collapsing a company walks out through shared papers into every
+      // co-author on the map and takes the whole field with it — 48 of 81 nodes, which is not a
+      // collapse, it is a deletion.
+      //
+      // A neighbour of a *higher* level than we started from does not hold anything: concepts and
+      // the wider skeleton stay visible by design, and they are what a hidden paper is about.
+      for (let changed = true; changed; ) {
+        changed = false
+        for (const id of [...out]) {
+          let held = false
+          kg.graph.forEachEdge(id, (_key, a, src, tgt) => {
+            if (held) return
+            if ((a as { agg?: boolean }).agg) return
+            const other = src === id ? tgt : src
+            if (other === from || out.has(other)) return
+            if (rankOf(other) > ceiling) return
+            held = true
+          })
+          if (held) {
+            out.delete(id)
+            changed = true
+          }
+        }
       }
       return out
     },
@@ -365,8 +399,7 @@ export default function App() {
   const collapse = useCallback(
     (ids: string[]) => {
       if (!kg || !selected) return
-      const fromKind = kg.graph.getNodeAttribute(selected, 'kind') as string | undefined
-      const add = descend(ids, fromKind)
+      const add = descend(ids, selected)
       if (!add.size) return
       const next = new Set(hidden)
       add.forEach((id) => next.add(id))
@@ -406,7 +439,7 @@ export default function App() {
   /** Show exactly what this group put away, leaving other collapses alone. */
   const revealSome = useCallback(
     (ids: string[]) => {
-      const under = descend(ids)
+      const under = descend(ids, selected)
       const gone = [...under].filter((id) => hidden.has(id))
       if (!gone.length) return
       const next = new Set(hidden)
