@@ -218,9 +218,12 @@ export default function App() {
   }, [hosts, kg])
 
   /**
-   * Hide neighbours of this node, keeping the mass they carried visible as a ring. A node is
-   * only hidden when the relation to this node is its only visible structure — collapsing one
-   * that is wired to the rest of the map would take that wiring with it.
+   * Hide these nodes, keeping the mass they carried visible as a ring on the node you collapsed
+   * them into.
+   *
+   * A button the reader pressed is an instruction, so it is obeyed even when the node also hangs
+   * off something else — collapsing a cluster is supposed to take its lines away. (The automatic
+   * pass is the one that refuses to break the skeleton; nobody asked it for anything.)
    */
   const collapse = useCallback(
     (ids: string[]) => {
@@ -229,16 +232,8 @@ export default function App() {
       const taken: string[] = []
       for (const id of ids) {
         if (keep.has(id) || id === selected) continue
-        let elsewhere = 0
-        kg.graph.forEachEdge(id, (_k, _a, s, t) => {
-          const other = s === id ? t : s
-          if (other === selected || keep.has(other)) return
-          elsewhere += 1
-        })
-        if (elsewhere === 0) {
-          keep.add(id)
-          taken.push(id)
-        }
+        keep.add(id)
+        taken.push(id)
       }
       if (!taken.length) return
       setHidden(keep)
@@ -342,8 +337,12 @@ export default function App() {
     members.sort((a, b) => a.w - b.w)
     const hiddenNow = new Set<string>()
     const hosts = new Map<string, Set<string>>()
+    // A node that is wearing a ring stays: it is the only thing left on the map that still
+    // accounts for what it hides, and hiding it too would throw that away.
+    const protectedNodes = new Set<string>()
     const put = (id: string, host: string | null) => {
       hiddenNow.add(id)
+      if (host) protectedNodes.add(host)
       // A node can be hidden without a host: a whole concept cluster has nothing left on the
       // map to hang off, and inventing one would mean a ring around a node that is not there.
       if (!host) return
@@ -354,6 +353,7 @@ export default function App() {
     // Pass one: members of concepts, weakest first, until the map fits.
     for (const m of members) {
       if (kg.graph.order - hiddenNow.size <= target) break
+      if (protectedNodes.has(m.id)) continue
       put(m.id, m.host)
     }
     // Pass two: if that was not enough, whole concept clusters go — the concept with everything
@@ -361,7 +361,7 @@ export default function App() {
     if (kg.graph.order - hiddenNow.size > target) {
       for (const c of concepts) {
         if (kg.graph.order - hiddenNow.size <= target) break
-        if (hiddenNow.has(c)) continue
+        if (hiddenNow.has(c) || protectedNodes.has(c)) continue
         put(c, null)
       }
     }
@@ -376,9 +376,19 @@ export default function App() {
       loose.sort((a, b) => a.w - b.w)
       for (const l of loose) {
         if (kg.graph.order - hiddenNow.size <= target) break
-        put(l.id, null)
+        if (hiddenNow.has(l.id) || protectedNodes.has(l.id)) continue
+        // Asked now, not when the list was built: what holds a node is whoever is still on the
+        // map at the moment it goes — otherwise the ring ends up on a node that is gone too.
+        let hold: string | null = null
+        kg.graph.forEachNeighbor(l.id, (n) => {
+          if (!hiddenNow.has(n)) hold = n
+        })
+        put(l.id, hold)
       }
     }
+
+    // A host that went away itself cannot wear a ring; its hidden mass belongs to the banner.
+    for (const h of [...hosts.keys()]) if (hiddenNow.has(h)) hosts.delete(h)
     if (hiddenNow.size) {
       setHidden(hiddenNow)
       setHosts(hosts)
@@ -577,7 +587,8 @@ export default function App() {
               say what it is hiding is a lie about the map. */}
           {selected && hosts.get(selected)?.size ? (
             <p className="collapsed">
-              <b>{hosts.get(selected)?.size}</b> nodes are collapsed here —{' '}
+              <b>{hosts.get(selected)?.size}</b>{' '}
+              {hosts.get(selected)?.size === 1 ? 'node is' : 'nodes are'} collapsed here —{' '}
               <button className="link" onClick={() => reveal(selected)}>
                 show them
               </button>

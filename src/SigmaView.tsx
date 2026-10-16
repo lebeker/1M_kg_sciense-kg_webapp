@@ -270,7 +270,8 @@ export default function SigmaView({
         const p = point(id)
         ctx.save()
         ctx.strokeStyle = 'rgba(150,190,255,0.55)'
-        ctx.lineWidth = 1 + Math.min(4, Math.sqrt(Math.max(0, mass)) * 0.5)
+        // Thicker with what it hides, and never so thin that it reads as a stray pixel.
+        ctx.lineWidth = 1.5 + Math.min(5, Math.sqrt(Math.max(0, mass)) * 0.7)
         ctx.beginPath()
         ctx.arc(p.x, p.y, radius(id) + 4, 0, Math.PI * 2)
         ctx.stroke()
@@ -415,6 +416,11 @@ export default function SigmaView({
     <div
       className="canvas"
       ref={host}
+      // What was actually drawn, on the element: a page that draws something different from what
+      // it was asked to draw is hard to see from the outside, and this is how a test sees it.
+      data-drawn={kg.graph.order - (hidden?.size ?? 0)}
+      data-collapsed={hidden?.size ?? 0}
+      data-rings={halos?.size ?? 0}
       style={insetRight ? { width: `calc(100% - ${insetRight}px)` } : undefined}
     >
       {progress ? (
