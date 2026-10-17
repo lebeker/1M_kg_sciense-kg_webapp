@@ -485,3 +485,26 @@ button.tiny:hover, button.link:hover { color: #cfe0ff; }
   font-size: 10px; color: var(--muted-foreground); text-transform: lowercase;
 }
 .halo-kind { font-variant-numeric: tabular-nums; }
+
+/* The legend's relation switches: the kinds above, the relation words below, and a switch each.
+   A muted word is struck through, not removed — the reader needs to see what they switched off. */
+.legend h4 {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  margin: 7px 0 3px; padding-top: 6px; border-top: 1px solid var(--border);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.legend .rels { list-style: none; margin: 0; padding: 0; max-height: 34vh; overflow: auto; }
+.legend .rel {
+  display: flex; align-items: center; gap: 6px; width: 100%; padding: 1px 2px;
+  background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.legend .rel .word { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legend .rel .mark {
+  width: 9px; height: 9px; border-radius: 2px; flex: none;
+  border: 1px solid var(--muted-foreground); background: var(--muted-foreground);
+}
+.legend .rel.off { color: var(--muted-foreground); }
+.legend .rel.off .word { text-decoration: line-through; }
+.legend .rel.off .mark { background: none; }
+.legend .rel:hover .word { color: var(--foreground); }

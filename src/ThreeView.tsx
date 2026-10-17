@@ -39,6 +39,8 @@ type Props = {
   hidden?: Set<string>
   /** What is collapsed inside a node, per kind — drawn here as a cloud with nodes in orbit. */
   halos?: Map<string, Halo[]>
+  /** Relation words switched off in the legend: not drawn here either. */
+  muted?: Set<string>
   /** Does a directed relation get a head by default? The graph decides. */
   arrows?: boolean
   /** Multiplies every relation's width. The graph decides. */
@@ -56,6 +58,7 @@ export default function ThreeView({
   focus,
   hidden,
   halos,
+  muted,
   arrows = false,
   edgeScale = 1,
 }: Props) {
@@ -87,7 +90,7 @@ export default function ThreeView({
         const g = ForceGraph3D()(el)
         // Fresh objects, kept in a ref: the engine writes x/y/z back onto them in place, and
         // that is how "fly to this node" finds where it ended up.
-        const fresh = toForceGraph(kg, hidden)
+        const fresh = toForceGraph(kg, hidden, muted)
         data.current = fresh
         clouds.current = []
 
@@ -197,7 +200,7 @@ export default function ThreeView({
       data.current = null
       clouds.current = []
     }
-  }, [kg, hidden, halos, arrows, edgeScale])
+  }, [kg, hidden, halos, muted, arrows, edgeScale])
 
   // Follow a connection in 3D: park the camera along the line from the origin to the node, the
   // standard way to look at one thing without losing where it is.

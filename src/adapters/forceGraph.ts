@@ -1,4 +1,4 @@
-import type { Kg } from '../kg'
+import { type Kg, relationOf } from '../kg'
 
 /**
  * The 3d-force-graph shape. It is deliberately *not* graphology: 3d-force-graph
@@ -43,7 +43,12 @@ export type ForceGraphData = { nodes: ForceNode[]; links: ForceLink[] }
  * `z` carries hierarchy when the document has `level` (top level nearest the
  * camera); otherwise it is 0 and the force layout arranges depth itself.
  */
-export function toForceGraph(kg: Kg, hidden?: Set<string>, zScale = 60): ForceGraphData {
+export function toForceGraph(
+  kg: Kg,
+  hidden?: Set<string>,
+  muted?: Set<string>,
+  zScale = 60,
+): ForceGraphData {
   const nodes: ForceNode[] = []
   const skip = hidden ?? new Set<string>()
   kg.graph.forEachNode((id, a) => {
@@ -64,6 +69,8 @@ export function toForceGraph(kg: Kg, hidden?: Set<string>, zScale = 60): ForceGr
   const links: ForceLink[] = []
   kg.graph.forEachEdge((_key, a, source, target) => {
     if (skip.has(source) || skip.has(target)) return
+    // A muted relation is not drawn in either view: muting is one decision, read by both.
+    if (muted?.size && muted.has(relationOf(a as Record<string, unknown>))) return
     const link: ForceLink = {
       source,
       target,

@@ -8,7 +8,7 @@ import {
   EdgeTriangleProgram,
   createEdgeArrowProgram,
 } from 'sigma/rendering'
-import { type Halo, type Kg, edgeDash, edgePx, edgeShape, pxSize } from './kg'
+import { type Halo, type Kg, edgeDash, edgePx, edgeShape, pxSize, relationOf } from './kg'
 
 type Props = {
   kg: Kg
@@ -30,6 +30,8 @@ type Props = {
   halos?: Map<string, Halo[]>
   /** Bumped when edges were invented or withdrawn without the document changing. */
   graphVersion?: number
+  /** Relation words this view is asked not to draw. */
+  muted?: Set<string>
   /** Nodes the reader (or the measured budget) has collapsed away. */
   hidden?: Set<string>
   /** Does a directed relation get a head by default? The graph decides; this is that decision. */
@@ -86,6 +88,7 @@ export default function SigmaView({
   halos,
   graphVersion,
   hidden,
+  muted,
   arrows = false,
   edgeScale = 1,
   calibrating = false,
@@ -96,6 +99,7 @@ export default function SigmaView({
   const selRef = useRef<string | null>(selected)
   const selectRef = useRef(onSelect)
   const hoverRef = useRef<string | null>(null)
+  const mutedRef = useRef<Set<string>>(new Set())
   const halosRef = useRef<Map<string, Halo[]>>(new Map())
   const hiddenRef = useRef<Set<string>>(new Set())
   const calRef = useRef<Set<string>>(new Set())
@@ -104,6 +108,7 @@ export default function SigmaView({
   selRef.current = selected
   selectRef.current = onSelect
   hoverRef.current = hoverEdge ?? null
+  mutedRef.current = muted ?? new Set()
   halosRef.current = halos ?? new Map()
   hiddenRef.current = hidden ?? new Set()
 
@@ -142,6 +147,9 @@ export default function SigmaView({
         const a = kg.graph.hasEdge(edge)
           ? (kg.graph.getEdgeAttributes(edge) as Record<string, unknown>)
           : {}
+        // Muted globaly, from the legend: a texture relation like a co-citation is a fact about
+        // the corpus, and left in it makes every paper it touches look central.
+        if (mutedRef.current.has(relationOf(a))) return { ...data, hidden: true }
         // What a relation *looks* like is a property of the relation, said in the document:
         // `style: "dotted arrow"` gives both, and nothing here changes for a new word.
         const type = edgeShape(a, arrows)
@@ -221,6 +229,9 @@ export default function SigmaView({
       kg.graph.forEachEdge((edge, a, source, target) => {
         const dash = edgeDash(a as Record<string, unknown>)
         if (!dash) return
+        // Muted in the legend: the overlay draws what the GL pass does not, so it has to agree
+        // with it about what is left out.
+        if (mutedRef.current.has(relationOf(a as Record<string, unknown>))) return
         if (!visible(source) || !visible(target)) return
         const s = point(source)
         const t = point(target)

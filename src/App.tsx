@@ -7,6 +7,9 @@ import {
   kindsOf,
   loadDocs,
   loadKg,
+  mutedOf,
+  relationOf,
+  relationsOf,
   weightOf,
 } from './kg'
 import SigmaView from './SigmaView'
@@ -105,6 +108,8 @@ export default function App() {
   const [graphVersion, setGraphVersion] = useState(0)
   /** What the button would fold away, worked out when the pointer is on it. */
   const [preview, setPreview] = useState<number | null>(null)
+  /** Relation words the reader has switched off; the document may state a starting set. */
+  const [muted, setMuted] = useState<Set<string>>(new Set())
   const [folded, setFolded] = useState<Set<string>>(new Set())
   /** The node budget measured on this host, and whether the reader has insisted on more. */
   const [budget, setBudget] = useState<number | null>(null)
@@ -116,7 +121,12 @@ export default function App() {
   const asked = useRef(false)
 
   useEffect(() => {
-    loadKg().then(setKg)
+    loadKg().then((k) => {
+      setKg(k)
+      // The graph may say what it wants drawn without; the legend starts there and the reader
+      // may change it for the session.
+      setMuted(mutedOf(k))
+    })
     loadDocs().then(setDocs)
   }, [])
 
@@ -127,6 +137,8 @@ export default function App() {
   }, [])
 
   const kinds = useMemo(() => (kg ? kindsOf(kg) : []), [kg])
+  /** Every relation word with its count, for the legend's switches. */
+  const relations = useMemo(() => (kg ? relationsOf(kg) : []), [kg])
 
   const hits = useMemo<Hit[]>(() => {
     const needle = query.trim().toLowerCase()
@@ -151,6 +163,9 @@ export default function App() {
     if (!kg || !selected || !kg.graph.hasNode(selected)) return []
     const out: Conn[] = []
     kg.graph.forEachEdge(selected, (key, a, source, target) => {
+      // A muted relation is not in the drawing, so it is not in the list either: the panel and
+      // the picture have to be the same view of the graph, or one of them is lying.
+      if (muted.has(relationOf(a as Record<string, unknown>))) return
       // A relation authored as `dir: out` is stored reversed so its arrow can point at what it
       // names; what the reader wrote is what the panel reads.
       const from = (a.authored_from as string) ?? source
@@ -174,7 +189,7 @@ export default function App() {
     return out.sort((x, y) => y.power - x.power)
     // graphVersion: a collapse adds and withdraws lines without the document changing, and the
     // panel has to read the drawing, not the file.
-  }, [kg, selected, graphVersion])
+  }, [kg, selected, graphVersion, muted])
 
   /** The same list, folded by relation word: what the panel shows a block at a time. */
   const groups = useMemo<Group[]>(() => {
@@ -305,6 +320,7 @@ export default function App() {
         const here = rankOf(id)
         kg.graph.forEachEdge(id, (_key, a, src, tgt) => {
           if ((a as { agg?: boolean }).agg) return
+          if (muted.has(relationOf(a as Record<string, unknown>))) return
           if (rels && !rels.has(String((a as { label?: unknown }).label ?? ''))) return
           const other = src === id ? tgt : src
           if (out.has(other) || other === from) return
@@ -314,7 +330,7 @@ export default function App() {
       }
       return out
     },
-    [kg],
+    [kg, muted],
   )
 
   /**
@@ -353,6 +369,7 @@ export default function App() {
         if (!kg.graph.hasNode(h)) return
         kg.graph.forEachEdge(h, (_key, a, src, tgt) => {
           if ((a as { agg?: boolean }).agg) return
+          if (muted.has(relationOf(a as Record<string, unknown>))) return
           const other = src === h ? tgt : src
           if (hiddenSet.has(other) || other === host) return
           if (!kg.graph.hasNode(other)) return
@@ -380,7 +397,7 @@ export default function App() {
       })
       setGraphVersion((v) => v + 1)
     },
-    [kg],
+    [kg, muted],
   )
 
   const collapse = useCallback(
@@ -688,6 +705,7 @@ export default function App() {
             halos={halos}
             graphVersion={graphVersion}
             hidden={hidden}
+            muted={muted}
             arrows={kg.meta?.visuals?.arrows ?? false}
             edgeScale={kg.meta?.visuals?.edge_width ?? 1}
             calibrating={calibrating}
@@ -699,6 +717,7 @@ export default function App() {
               kg={kg}
               onSelect={onSelect}
               halos={halos}
+              muted={muted}
               insetRight={selected ? PANEL_PX : 0}
               focus={focus}
               hidden={hidden}
@@ -709,15 +728,60 @@ export default function App() {
         )}
       </div>
 
-      {kinds.length > 0 && (
-        <ul className="legend">
-          {kinds.slice(0, 12).map((k) => (
-            <li key={k.kind}>
-              <span className="dot" style={{ background: k.color }} />
-              {k.kind} <i>{k.count}</i>
-            </li>
-          ))}
-        </ul>
+      {(kinds.length > 0 || relations.length > 0) && (
+        <div className="legend">
+          {kinds.length > 0 && (
+            <ul>
+              {kinds.slice(0, 12).map((k) => (
+                <li key={k.kind}>
+                  <span className="dot" style={{ background: k.color }} />
+                  {k.kind} <i>{k.count}</i>
+                </li>
+              ))}
+            </ul>
+          )}
+          {relations.length > 0 && (
+            <>
+              <h4>
+                relations
+                {muted.size > 0 ? (
+                  <button className="link" onClick={() => setMuted(new Set())}>
+                    all on
+                  </button>
+                ) : null}
+              </h4>
+              <ul className="rels">
+                {relations.map((r) => {
+                  const off = muted.has(r.rel)
+                  return (
+                    <li key={r.rel}>
+                      <button
+                        className={off ? 'rel off' : 'rel'}
+                        title={
+                          off
+                            ? 'muted everywhere: not drawn, not listed in the panel, and not walked by a collapse'
+                            : 'drawn — switch a relation off when it says more about the corpus than about the field'
+                        }
+                        onClick={() =>
+                          setMuted((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(r.rel)) next.delete(r.rel)
+                            else next.add(r.rel)
+                            return next
+                          })
+                        }
+                      >
+                        <span className="mark" />
+                        <span className="word">{r.rel}</span>
+                        <i>{r.n}</i>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          )}
+        </div>
       )}
 
       {nodeAttrs && (

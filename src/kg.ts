@@ -472,6 +472,29 @@ export function pxSize(raw: unknown): number {
 
 export type KindCount = { kind: string; color: string; count: number }
 
+/** The word a relation is foldable by: its label, or the catch-all. */
+export function relationOf(a: Record<string, unknown>): string {
+  return typeof a.label === 'string' && a.label ? a.label : 'related'
+}
+
+/** Every relation word in the document with how many relations carry it, commonest first. */
+export function relationsOf(kg: Kg): { rel: string; n: number }[] {
+  const count = new Map<string, number>()
+  kg.graph.forEachEdge((_key, a) => {
+    const rel = relationOf(a as Record<string, unknown>)
+    count.set(rel, (count.get(rel) ?? 0) + 1)
+  })
+  return [...count.entries()]
+    .map(([rel, n]) => ({ rel, n }))
+    .sort((x, y) => y.n - x.n || x.rel.localeCompare(y.rel))
+}
+
+/** What this graph asks to be drawn without. A view is free to change it at any time. */
+export function mutedOf(kg: Kg): Set<string> {
+  const declared = (kg.meta?.visuals as { mute?: unknown } | undefined)?.mute
+  return new Set(Array.isArray(declared) ? declared.map(String) : [])
+}
+
 export function kindsOf(kg: Kg): KindCount[] {
   const by = new Map<string, KindCount>()
   kg.graph.forEachNode((_id, a) => {
