@@ -1,9 +1,9 @@
 {
   "name": "kg-viewer",
-  "version": "0.0.12",
-  "built_at": "2026-10-17T14:54:01.634Z",
+  "version": "0.0.13",
+  "built_at": "2026-10-18T15:13:58.865Z",
   "origin": "https://github.com/lebeker/1M_kg_sciense-kg_webapp",
   "commit": "397de7a",
-  "bytes": 1995669,
-  "fetch_url": "https://raw.githubusercontent.com/lebeker/1M_kg_sciense-kg_webapp/viewer-v0.0.12/viewer.html"
+  "bytes": 1998680,
+  "fetch_url": "https://raw.githubusercontent.com/lebeker/1M_kg_sciense-kg_webapp/viewer-v0.0.13/viewer.html"
 }
