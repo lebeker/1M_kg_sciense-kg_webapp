@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Sigma from 'sigma'
 import type Graph from 'graphology'
 import {
@@ -430,10 +430,27 @@ export default function SigmaView({
     cam.animate({ ...state, x: at.x, y: at.y, ratio }, { duration: 450 })
   }, [focus, graph])
 
+  // The layout is the picture: if two loads of the same document disagree here, the document is
+  // the same and the drawing is not — which is exactly what "it rotates on refresh" means.
+  const posHash = useMemo(() => {
+    let h = 2166136261
+    kg.graph.forEachNode((id, a) => {
+      const x = Math.round((Number(a.x) || 0) * 10)
+      const y = Math.round((Number(a.y) || 0) * 10)
+      const text = `${id}:${x},${y};`
+      for (let i = 0; i < text.length; i += 1) {
+        h ^= text.charCodeAt(i)
+        h = Math.imul(h, 16777619)
+      }
+    })
+    return (h >>> 0).toString(36)
+  }, [kg])
+
   return (
     <div
       className="canvas"
       ref={host}
+      data-pos-hash={posHash}
       // What was actually drawn, on the element: a page that draws something different from what
       // it was asked to draw is hard to see from the outside, and this is how a test sees it.
       data-drawn={kg.graph.order - (hidden?.size ?? 0)}
