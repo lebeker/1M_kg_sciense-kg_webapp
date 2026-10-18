@@ -166,16 +166,18 @@ export function foldState(
     return true
   }
 
-  /** A node with nothing above it cannot go up: what it holds is folded into it instead. */
+  /**
+   * Folding a node means folding **what it holds first, then itself if it can go up**. Skipping
+   * the first half is what made the map inconsistent: a scientist with a parent folded alone and
+   * left her company standing, while a concept with no parent swept its whole branch. Same click,
+   * two different results, and no way for a reader to know which one they were about to get.
+   */
   const foldInto = (root: string) => {
-    if (parentsOf(root).length) {
-      foldOne(root)
-      return
-    }
     const sub = subtreeOf(kg, root, muted).sort(
       (a, b) => levelOf(kg, b) - levelOf(kg, a) || a.localeCompare(b),
     )
     for (const id of sub) if (visible(id)) foldOne(id)
+    if (parentsOf(root).length) foldOne(root)
   }
 
   if (foldAll) {
