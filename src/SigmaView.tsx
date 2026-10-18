@@ -114,14 +114,18 @@ export default function SigmaView({
 
   // Fit, then back off a little: sigma's reset fits node centres, so a big circle or a
   // label at the edge of the frame ends up half outside it.
-  const fitCamera = (cam: ReturnType<Sigma['getCamera']>) => {
-    cam
-      .animatedReset()
-      .then(() => {
-        const state = cam.getState()
-        cam.setState({ ...state, ratio: state.ratio * 1.15 })
-      })
-      .catch(() => {})
+  // The first frame is the final one: an animated reset means every reload passes through a
+  // different in-between state, and a reader refreshing the page sees the map rotate and some
+  // labels and hairlines come and go. A fit someone presses stays animated; a fit on load is
+  // instant.
+  const fitCamera = (cam: ReturnType<Sigma['getCamera']>, animate = false) => {
+    const back = () => {
+      const state = cam.getState()
+      cam.setState({ ...state, ratio: state.ratio * 1.15 })
+    }
+    // Duration 0 on load: the same end state, reached without a visible zoom that a refresh can
+    // catch halfway. A press of "fit" keeps the ease because the reader asked to watch it.
+    cam.animatedReset({ duration: animate ? 320 : 0 }).then(back).catch(() => {})
   }
 
   useEffect(() => {
@@ -411,7 +415,7 @@ export default function SigmaView({
     const s = sigma.current
     if (!s) return
     s.resize()
-    fitCamera(s.getCamera())
+    fitCamera(s.getCamera(), fitSignal > 0)
   }, [fitSignal, insetRight])
 
   // Follow a connection: put that node in the middle. The canvas is already narrower than the
