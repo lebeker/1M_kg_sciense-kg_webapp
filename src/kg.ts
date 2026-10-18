@@ -215,23 +215,20 @@ export function ensurePositions(kg: Kg): 'authored' | 'rings' | 'computed' {
     return 'rings'
   }
 
-  // Deterministic start. `random.assign` and `Math.random` made the same document come out as a
-  // different picture on every reload — a graph that moves when nothing changed reads as a bug,
-  // and it makes two sessions impossible to compare. The seed is the node's id, so the same
-  // document always lands in the same layout.
-  const seedOf = (id: string): number => {
-    let h = 2166136261
-    for (let i = 0; i < id.length; i += 1) {
-      h ^= id.charCodeAt(i)
-      h = Math.imul(h, 16777619)
-    }
-    return (h >>> 0) / 4294967296
-  }
-  g.forEachNode((id, a) => {
+  // Deterministic start: nodes on a phyllotaxis spiral in document order. `random.assign` and
+  // `Math.random` made the same document come out as a different picture on every reload — a map
+  // that moves when nothing changed reads as a bug — and a hash-scattered start bunched nodes up
+  // so tightly that the simulation never pulled them apart. A spiral is both stable and evenly
+  // spaced, which is the only reason it is here.
+  let i = 0
+  const golden = Math.PI * (3 - Math.sqrt(5))
+  const n0 = g.order || 1
+  g.forEachNode((id: string, a: Record<string, unknown>) => {
+    i += 1
     if (placed(a)) return
-    const sx = seedOf(`${id}|x`)
-    const sy = seedOf(`${id}|y`)
-    g.mergeNodeAttributes(id, { x: (sx - 0.5) * 100, y: (sy - 0.5) * 100 })
+    const r = 40 * Math.sqrt(i / n0)
+    const t = i * golden
+    g.mergeNodeAttributes(id, { x: r * Math.cos(t), y: r * Math.sin(t) })
   })
 
   forceAtlas2.assign(g, {
