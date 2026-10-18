@@ -487,27 +487,27 @@ export function pxSize(raw: unknown): number {
 export type KindCount = { kind: string; color: string; count: number }
 
 /**
- * The word a relation *is*. `rel` when the document names one; otherwise the label, minus a count
- * the label repeats from a property of its own edge:
+ * The word a relation *is*, without the measurement some documents put in the label:
  *
- *     "co-cited in 66 works"  +  cocited: 66  ->  "co-cited"
+ *     "co-cited in 66 works"  ->  "co-cited"
+ *     "co-cited in 1 works"   ->  "co-cited"      (even with no `cocited` on the edge)
  *
- * Nineteen co-citations on one paper produced thirteen legend words ("co-cited in 8 works",
- * "co-cited in 9 works", …) as if the number of shared citations were a different kind of
- * relation. It is not: it is the measurement of one relation, and it is already on the edge.
- * A label whose number is not carried by the edge is left exactly as written.
+ * Nineteen co-citations on one paper produced thirteen legend words, as if the number of shared
+ * citations were a different kind of relation. Two of them even slipped through a stricter rule
+ * because their edges forgot to carry the number — a type that exists only because a property is
+ * missing is not a type.
+ *
+ * The rule is narrow on purpose: only a trailing `<number> <counting noun>`, optionally preceded
+ * by "in". A label like "published in 2019 in Nature" keeps its year, because "Nature" is not a
+ * counting noun. If the document names `rel` explicitly, that wins and nothing is guessed.
  */
+const COUNTED_TAIL = /^(.*?)\s+(?:in\s+|x\s+|×\s+)?(\d+(?:\.\d+)?)\s+(?:works?|papers?|citations?|cited\s+works?|times?|studies|articles?|records?|mentions?)$/i
+
 export function relationOf(a: Record<string, unknown>): string {
   if (typeof a.rel === 'string' && a.rel) return a.rel
   const label = typeof a.label === 'string' && a.label ? a.label : 'related'
-  const m = label.match(/^(.*?)\s+(?:in\s+)?(\d+(?:\.\d+)?)\s+\S+$/)
-  if (m) {
-    const n = Number(m[2])
-    for (const v of Object.values(a)) {
-      if (typeof v === 'number' && v === n) return m[1].trim()
-    }
-  }
-  return label
+  const m = label.match(COUNTED_TAIL)
+  return m && m[1].trim() ? m[1].trim() : label
 }
 
 /** Every relation word in the document with how many relations carry it, commonest first. */
