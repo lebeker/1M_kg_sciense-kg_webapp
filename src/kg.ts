@@ -39,6 +39,14 @@ export type KgVisuals = {
   max_nodes?: number
   /** A note about the measurement, shown with the banner. */
   max_nodes_note?: string
+  /**
+   * Relation words that are an attribute of a node, never a container of it: an employer is not
+   * inside an employee. A fold never walks these and never hides what hangs on them — it moves
+   * them up with the node, at its share. Defaults live in fold.ts.
+   */
+  attributes?: string[]
+  /** Relation words the reader starts with switched off (`visuals --mute`). */
+  mute?: string[]
 }
 
 /**

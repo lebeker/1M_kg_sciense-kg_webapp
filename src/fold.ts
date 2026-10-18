@@ -36,7 +36,7 @@ export type FoldState = {
   stuck: Set<string>
 }
 
-type Rel = { power: number }
+type Rel = { power: number; label: string }
 
 const levelOf = (kg: Kg, id: string): number => {
   const a = kg.graph.hasNode(id) ? (kg.graph.getNodeAttribute(id, 'level') as unknown) : undefined
@@ -48,24 +48,58 @@ const levelOf = (kg: Kg, id: string): number => {
 const kindOf = (kg: Kg, id: string): string =>
   String(kg.graph.getNodeAttribute(id, 'kind') ?? 'node')
 
+/**
+ * Relations that are an **attribute of a node, not a container of it**. An employer is not
+ * inside an employee: folding a person must never hide the lab they work at. These relations are
+ * never walked, and whatever hangs on them survives the fold, re-attached to the parents at its
+ * share. A document can add to the list with `meta.visuals.attributes`.
+ */
+const ATTRIBUTE_RELATIONS = new Set([
+  'works at',
+  'works for',
+  'worked at',
+  'affiliated with',
+  'affiliation',
+  'employed by',
+  'member of',
+  'funder',
+  'funded by',
+])
+
+type Adj = { tree: Map<string, Map<string, Rel>>; attr: Map<string, Map<string, Rel>> }
+
 /** Edges as the fold sees them: the document's, minus what the reader has switched off. */
-function buildAdj(kg: Kg, muted: Set<string>): Map<string, Map<string, Rel>> {
-  const adj = new Map<string, Map<string, Rel>>()
-  kg.graph.forEachNode((id) => adj.set(id, new Map()))
+function buildAdj(kg: Kg, muted: Set<string>, attributes: Set<string>): Adj {
+  const tree: Adj['tree'] = new Map()
+  const attr: Adj['attr'] = new Map()
+  kg.graph.forEachNode((id) => {
+    tree.set(id, new Map())
+    attr.set(id, new Map())
+  })
   kg.graph.forEachEdge((_k, a, s, t) => {
     const attrs = a as Record<string, unknown>
     if (attrs.agg) return
-    if (muted.has(relationOf(attrs))) return
+    const rel = relationOf(attrs)
+    if (muted.has(rel)) return
     const power = typeof attrs.power === 'number' ? attrs.power : 1
-    adj.get(s)?.set(t, { power })
-    adj.get(t)?.set(s, { power })
+    // The relation keeps its own word when a fold re-attaches it: a company linked to a person
+    // still says "works at" when it is re-hung on the concept above them. Renaming it to
+    // "through what is folded" makes a surviving link look like a vanished one.
+    const label = String(attrs.label ?? rel ?? 'related')
+    if (attributes.has(rel.toLowerCase()) || attributes.has(label.toLowerCase())) {
+      attr.get(s)?.set(t, { power, label })
+      attr.get(t)?.set(s, { power, label })
+      return
+    }
+    tree.get(s)?.set(t, { power, label })
+    tree.get(t)?.set(s, { power, label })
   })
-  return adj
+  return { tree, attr }
 }
 
 /** Everything under a node: reachable through neighbours of a deeper level. */
-export function subtreeOf(kg: Kg, root: string, muted: Set<string>): string[] {
-  const adj = buildAdj(kg, muted)
+export function subtreeOf(kg: Kg, root: string, muted: Set<string>, attributes = new Set<string>()): string[] {
+  const adj = buildAdj(kg, muted, attributes).tree
   const out = new Set<string>()
   // Monotone in `level`: every step goes strictly deeper than the node it leaves. Comparing
   // against the *root's* level instead would make a paper's co-citation peers (same level as the
@@ -90,10 +124,12 @@ export function foldState(
   opts: { muted: Set<string>; ops: string[]; kinds: Set<string> },
 ): FoldState {
   const { muted, ops, kinds } = opts
-  const adj = buildAdj(kg, muted)
+  const attributes = new Set<string>([...ATTRIBUTE_RELATIONS])
+  for (const w of kg.meta?.visuals?.attributes ?? []) attributes.add(String(w).toLowerCase())
+  const { tree: adj, attr } = buildAdj(kg, muted, attributes)
   const hidden = new Set<string>()
   const absorbed = new Map<string, Absorbed>()
-  const virtual: VirtualEdge[] = []
+  const virtualBy = new Map<string, VirtualEdge>()
   const stuck = new Set<string>()
 
   const visible = (id: string) => adj.has(id) && !hidden.has(id)
@@ -112,7 +148,11 @@ export function foldState(
    * thin air.
    */
   const foldOne = (id: string): boolean => {
-    const parents = parentsOf(id)
+    // The tree decides first. A node the tree does not hold anywhere — an institution, which hangs
+    // on its people by an attribute — is carried by those people instead, so switching its kind off
+    // still does something.
+    let parents = parentsOf(id)
+    if (!parents.length) parents = [...(attr.get(id)?.keys() ?? [])].filter(visible)
     if (!parents.length) {
       stuck.add(id)
       return false
@@ -122,11 +162,23 @@ export function foldState(
     const mass = weightOf(kg, id) + (mine?.mass ?? 0)
     const byKind = new Map(mine?.byKind ?? [])
     byKind.set(kindOf(kg, id), (byKind.get(kindOf(kg, id)) ?? 0) + 1)
-    const below = childrenOf(id)
-    const belowPower = below.map((c) => ({ c, power: adj.get(id)?.get(c)?.power ?? 1 }))
+    // What the node was *attached to* rather than in charge of — its lab, its company, its funder.
+    // Those stay on the map; the fold moves them up with it, at the node's share. A tree child
+    // that is still visible (a fold started in the middle of a branch) is treated the same way:
+    // it re-hangs on the parents instead of being orphaned.
+    const survivors = [...(attr.get(id)?.keys() ?? []), ...childrenOf(id)]
+      .filter(visible)
+      .filter((c) => !parents.includes(c))
+      .map((c) => ({
+        c,
+        power: attr.get(id)?.get(c)?.power ?? adj.get(id)?.get(c)?.power ?? 1,
+        label: attr.get(id)?.get(c)?.label ?? adj.get(id)?.get(c)?.label ?? 'related',
+      }))
 
+    const below = childrenOf(id)
     hidden.add(id)
     adj.delete(id)
+    attr.delete(id)
     for (const n of [...below]) adj.get(n)?.delete(id)
     for (const p of parents) {
       adj.get(p)?.delete(id)
@@ -135,9 +187,23 @@ export function foldState(
       byKind.forEach((n, kd) => at.byKind.set(kd, (at.byKind.get(kd) ?? 0) + n / k))
       absorbed.set(p, at)
     }
-    for (const { c, power } of belowPower) {
+    for (const { c, power, label } of survivors) {
       for (const p of parents) {
-        virtual.push({ a: c, b: p, power: power / k, label: 'through what is folded' })
+        // Two papers by the same person at the same lab are one line to the concept, not two
+        // parallel ones: the share is summed per pair.
+        const [a, b] = c < p ? [c, p] : [p, c]
+        const key = `${a}|${b}|${label}`
+        const share = power / k
+        const at = virtualBy.get(key)
+        if (at) at.power += share
+        else virtualBy.set(key, { a, b, power: share, label })
+        // And it joins the simulation, so a later fold in the same pass sees it: folding a paper
+        // after its scientist must carry the scientist's institution up again, not drop it.
+        if (attr.has(c) && attr.has(p)) {
+          const seen = attr.get(c)?.get(p)?.power ?? 0
+          attr.get(c)?.set(p, { power: seen + share, label })
+          attr.get(p)?.set(c, { power: seen + share, label })
+        }
       }
     }
     absorbed.delete(id)
@@ -150,7 +216,7 @@ export function foldState(
       foldOne(root)
       return
     }
-    const sub = subtreeOf(kg, root, muted).sort(
+    const sub = subtreeOf(kg, root, muted, attributes).sort(
       (a, b) => levelOf(kg, b) - levelOf(kg, a) || a.localeCompare(b),
     )
     for (const id of sub) if (visible(id)) foldOne(id)
@@ -175,5 +241,5 @@ export function foldState(
     for (const id of ids) if (visible(id)) foldOne(id)
   }
 
-  return { hidden, absorbed, virtual, stuck }
+  return { hidden, absorbed, virtual: [...virtualBy.values()], stuck }
 }

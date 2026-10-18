@@ -3,7 +3,6 @@ import {
   type Halo,
   type Kg,
   kindColor,
-  kindRank,
   kindsOf,
   loadDocs,
   loadKg,
@@ -39,6 +38,8 @@ type Hit = { id: string; label: string; kind: string }
 
 /** One edge as the panel shows it: the relation, its power, and the node at the other end. */
 type Conn = {
+  /** A line this view invented by folding, not a relation in the document. */
+  agg?: boolean
   key: string
   other: string
   label: string
@@ -177,6 +178,15 @@ export default function App() {
     return kg.graph.getNodeAttributes(selected) as Record<string, unknown>
   }, [kg, selected])
 
+  const sim = useMemo(
+    () =>
+      kg
+        ? foldState(kg, { muted, ops: foldOps, kinds: hiddenKinds })
+        : { hidden: new Set<string>(), absorbed: new Map(), virtual: [], stuck: new Set<string>() },
+    [kg, muted, foldOps, hiddenKinds],
+  )
+  const hidden = useMemo(() => new Set<string>([...sim.hidden, ...calHidden]), [sim, calHidden])
+
   /** Everything the selected node is joined to, strongest first — the graph read as a list. */
   const connections = useMemo<Conn[]>(() => {
     if (!kg || !selected || !kg.graph.hasNode(selected)) return []
@@ -200,28 +210,21 @@ export default function App() {
         rel: typeof a.label === 'string' ? a.label : '',
         power: typeof a.power === 'number' ? a.power : 1,
         arrow: to === selected ? '←' : '→',
+        agg: !!(a as Record<string, unknown>).agg,
         extra: Object.entries(a as Record<string, unknown>).filter(
           ([k, v]) => !EDGE_LAID_OUT.has(k) && v !== undefined && v !== null,
         ) as [string, unknown][],
       })
     })
-    return out.sort((x, y) => y.power - x.power)
-    // graphVersion: a collapse adds and withdraws lines without the document changing, and the
-    // panel has to read the drawing, not the file.
-  }, [kg, selected, graphVersion, muted])
+    // A row pointing at something folded away is not a connection the reader can act on: the
+    // folded block above the list already accounts for it, by kind and in half-counts.
+    return out.filter((c) => !hidden.has(c.other)).sort((x, y) => y.power - x.power)
+    // graphVersion: a fold adds and withdraws lines without the document changing, and the panel
+    // has to read the drawing, not the file.
+  }, [kg, selected, graphVersion, muted, hidden])
 
   /** The same list, folded by relation word: what the panel shows a block at a time. */
   const groups = useMemo<Group[]>(() => {
-    // What sits below the node we are looking at: the same axis the collapse descends (kindRank),
-    // used here only to say whether the button can do anything at all.
-    const ceiling = !kg
-      ? 0
-      : kindRank(
-          kg,
-          kg.graph.hasNode(selected ?? '')
-            ? (kg.graph.getNodeAttribute(selected as string, 'kind') as string)
-            : undefined,
-        )
     const by = new Map<string, Conn[]>()
     for (const c of connections) {
       const key = c.rel || 'related'
@@ -229,14 +232,8 @@ export default function App() {
       if (at) at.push(c)
       else by.set(key, [c])
     }
-    return [...by.entries()].map(([rel, conns]) => ({
-      rel,
-      conns,
-      hideable: conns.some(
-        (c) => !!kg && kg.graph.hasNode(c.other) && kindRank(kg, kg.graph.getNodeAttribute(c.other, 'kind') as string) < ceiling,
-      ),
-    }))
-  }, [connections, kg, selected])
+    return [...by.entries()].map(([rel, conns]) => ({ rel, conns, hideable: false }))
+  }, [connections])
 
   /** What the numbers in `weight` measure, as the document itself states it. */
   const weightMetric = kg?.meta?.weight?.metric ?? 'connections'
@@ -279,15 +276,6 @@ export default function App() {
    * The view the fold decisions produce. Recomputed from the document every time a decision
    * changes — nothing about the picture is stored, so it cannot drift from the decision.
    */
-  const sim = useMemo(
-    () =>
-      kg
-        ? foldState(kg, { muted, ops: foldOps, kinds: hiddenKinds })
-        : { hidden: new Set<string>(), absorbed: new Map(), virtual: [], stuck: new Set<string>() },
-    [kg, muted, foldOps, hiddenKinds],
-  )
-  const hidden = useMemo(() => new Set<string>([...sim.hidden, ...calHidden]), [sim, calHidden])
-
   /**
    * What is folded inside each node, broken down by kind: a ring per kind, in that kind's own
    * colour, so a folded company reads differently from a folded researcher without a legend.
@@ -837,24 +825,6 @@ export default function App() {
                       {folded.has(g.rel) ? '▸' : '▾'} {g.rel}
                     </button>
                     <i>{g.conns.length}</i>
-                    <button
-                      className="tiny"
-                      title={
-                        g.conns.some((c) => sim.hidden.has(c.other))
-                          ? 'bring back what this relation put away'
-                          : 'put away what hangs below these nodes, and count what it reaches'
-                      }
-                      onClick={() => {
-                        const ids = g.conns.map((c) => c.other)
-                        if (ids.some((id) => sim.hidden.has(id))) {
-                          setFoldOps((ops) => ops.filter((r) => !ids.includes(r)))
-                        } else {
-                          setFoldOps((ops) => [...ops, ...ids.filter((id) => !ops.includes(id))])
-                        }
-                      }}
-                    >
-                      {g.conns.some((c) => sim.hidden.has(c.other)) ? 'unfold' : 'fold'}
-                    </button>
                   </div>
                   {folded.has(g.rel) ? null : (
                     <ul className="conns">
@@ -873,7 +843,7 @@ export default function App() {
                                 {c.arrow} {c.rel || 'related'}
                               </span>
                               <span className="power">×{c.power}</span>
-                              {hidden.has(c.other) ? <span className="tag">collapsed</span> : null}
+                              {c.agg ? <span className="tag">counted</span> : null}
                             </span>
                             <span className="other">{c.label}</span>
                             {c.extra.length > 0 ? (
