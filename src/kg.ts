@@ -486,9 +486,28 @@ export function pxSize(raw: unknown): number {
 
 export type KindCount = { kind: string; color: string; count: number }
 
-/** The word a relation is foldable by: its label, or the catch-all. */
+/**
+ * The word a relation *is*. `rel` when the document names one; otherwise the label, minus a count
+ * the label repeats from a property of its own edge:
+ *
+ *     "co-cited in 66 works"  +  cocited: 66  ->  "co-cited"
+ *
+ * Nineteen co-citations on one paper produced thirteen legend words ("co-cited in 8 works",
+ * "co-cited in 9 works", …) as if the number of shared citations were a different kind of
+ * relation. It is not: it is the measurement of one relation, and it is already on the edge.
+ * A label whose number is not carried by the edge is left exactly as written.
+ */
 export function relationOf(a: Record<string, unknown>): string {
-  return typeof a.label === 'string' && a.label ? a.label : 'related'
+  if (typeof a.rel === 'string' && a.rel) return a.rel
+  const label = typeof a.label === 'string' && a.label ? a.label : 'related'
+  const m = label.match(/^(.*?)\s+(?:in\s+)?(\d+(?:\.\d+)?)\s+\S+$/)
+  if (m) {
+    const n = Number(m[2])
+    for (const v of Object.values(a)) {
+      if (typeof v === 'number' && v === n) return m[1].trim()
+    }
+  }
+  return label
 }
 
 /** Every relation word in the document with how many relations carry it, commonest first. */
@@ -503,10 +522,27 @@ export function relationsOf(kg: Kg): { rel: string; n: number }[] {
     .sort((x, y) => y.n - x.n || x.rel.localeCompare(y.rel))
 }
 
-/** What this graph asks to be drawn without. A view is free to change it at any time. */
+/**
+ * What the view starts with switched off.
+ *
+ * **Co-citation is off by default.** A co-citation says which papers are cited together in the
+ * corpus, not what relates the field's ideas: nineteen hairlines on one paper turn it into a hub
+ * and make every other relation read as background. It is a fact worth seeing, so the legend keeps
+ * the switch — it just starts crossed out, and the reader turns it on when they want it.
+ *
+ * A document may also ask for a word to be drawn without; that list is added to this default, and
+ * a reader may change either for the session.
+ */
+const OFF_BY_DEFAULT = [/^co-?cit/i]
+
 export function mutedOf(kg: Kg): Set<string> {
+  const out = new Set<string>()
+  for (const { rel } of relationsOf(kg)) {
+    if (OFF_BY_DEFAULT.some((re) => re.test(rel))) out.add(rel)
+  }
   const declared = (kg.meta?.visuals as { mute?: unknown } | undefined)?.mute
-  return new Set(Array.isArray(declared) ? declared.map(String) : [])
+  if (Array.isArray(declared)) declared.forEach((w) => out.add(String(w)))
+  return out
 }
 
 export function kindsOf(kg: Kg): KindCount[] {
