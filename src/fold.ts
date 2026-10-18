@@ -38,11 +38,41 @@ export type FoldState = {
 
 type Rel = { power: number; label: string }
 
+/**
+ * A document that never wrote `level` still has a shape: a paper sits under its subject, a person
+ * under their paper, a lab under their person. Without this fallback a graph imported from a
+ * provider — no levels anywhere — had a fold button that did nothing at all, on every node.
+ */
+const DEFAULT_LEVEL: Record<string, number> = {
+  subject: 2,
+  topic: 2,
+  field: 2,
+  concept: 2,
+  idea: 2,
+  paper: 2.5,
+  publication: 2.5,
+  article: 2.5,
+  work: 2.5,
+  preprint: 2.5,
+  study: 2.5,
+  scientist: 3,
+  researcher: 3,
+  author: 3,
+  person: 3,
+  people: 3,
+  lab: 3.5,
+  laboratory: 3.5,
+  institution: 4,
+  university: 4,
+  company: 4,
+  funder: 4,
+}
+
 const levelOf = (kg: Kg, id: string): number => {
   const a = kg.graph.hasNode(id) ? (kg.graph.getNodeAttribute(id, 'level') as unknown) : undefined
-  // A node with no level cannot be placed in the tree; treating it as the deepest makes it a leaf,
-  // which is the safe reading — it can be folded away, never fold something else.
-  return typeof a === 'number' ? a : Number.MAX_SAFE_INTEGER
+  if (typeof a === 'number') return a
+  const kind = String(kg.graph.getNodeAttribute(id, 'kind') ?? '').toLowerCase()
+  return DEFAULT_LEVEL[kind] ?? 2.5
 }
 
 const kindOf = (kg: Kg, id: string): string =>

@@ -311,6 +311,16 @@ export default function App() {
     return out
   }, [sim, calHosts, kg])
 
+  /**
+   * What the button would do, before it is pressed. A fold that puts nothing away is not an
+   * action, and a button that silently does nothing is a bug report waiting to happen.
+   */
+  const foldPreview = useMemo(() => {
+    if (!kg || !selected || sim.hidden.has(selected)) return null
+    const after = foldState(kg, { muted, ops: [...foldOps, selected], kinds: hiddenKinds })
+    return after.hidden.size - sim.hidden.size
+  }, [kg, muted, foldOps, hiddenKinds, selected, sim])
+
   const fold = useCallback((id: string) => {
     setFoldOps((ops) => (ops.includes(id) ? ops : [...ops, id]))
     setSelected(id)
@@ -767,9 +777,10 @@ export default function App() {
               what it is hiding is a lie about the map. Counts can be fractional: a scientist
               shared by two papers is half in each orbit. */}
           {selected ? (
-            <p className="foldbar">
+            <p className="foldbar" data-fold-preview={foldPreview ?? ''}>
               <button
                 className="tiny"
+                disabled={!foldOps.includes(selected) && foldPreview === 0}
                 onClick={() => (foldOps.includes(selected) ? unfold(selected) : fold(selected))}
               >
                 {foldOps.includes(selected) ? 'unfold' : 'fold'}
@@ -777,7 +788,9 @@ export default function App() {
               <span>
                 {foldOps.includes(selected)
                   ? 'everything under this node is put away'
-                  : 'put away everything under this node — people first, then papers'}
+                  : foldPreview === 0
+                    ? 'nothing below this node to put away — it is the end of its branch'
+                    : `put away ${foldPreview ?? '…'} node${foldPreview === 1 ? '' : 's'} below this one`}
               </span>
             </p>
           ) : null}
