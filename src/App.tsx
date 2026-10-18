@@ -297,10 +297,17 @@ export default function App() {
     // Two mechanisms meet here: the reader's folds carry their own ledger, and the host budget
     // carries a set of nodes it put away. Both end up as a ring in a kind's colour.
     sim.absorbed.forEach((a: Absorbed, host: string) => {
-      a.byKind.forEach((n: number, kind: string) => {
-        if (!kg) return
-        add(host, kind, n, (a.mass * n) / [...a.byKind.values()].reduce((x, y) => x + y, 0))
+      if (!kg) return
+      // The *count* is a count of nodes, always an integer: half a scientist is how the mass is
+      // shared, not a number of people. Mass still sizes the ring.
+      const per = new Map<string, number>()
+      a.items.forEach((item) => {
+        if (!kg.graph.hasNode(item)) return
+        const kind = (kg.graph.getNodeAttribute(item, 'kind') as string | undefined) ?? 'other'
+        per.set(kind, (per.get(kind) ?? 0) + 1)
       })
+      const total = [...per.values()].reduce((x, y) => x + y, 0) || 1
+      per.forEach((n, kind) => add(host, kind, n, (a.mass * n) / total))
     })
     calHosts.forEach((kids, host) => {
       kids.forEach((k) => {
@@ -331,9 +338,6 @@ export default function App() {
   const unfold = useCallback((id: string) => {
     setFoldOps((ops) => ops.filter((r) => r !== id))
   }, [])
-
-  /** Counts can be halves: a scientist shared by two papers is 0.5 in each of their orbits. */
-  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, ''))
 
   /** Bring back what is folded inside one node, without touching the rest of the map. */
   const showInside = useCallback((id: string) => {
@@ -810,13 +814,13 @@ export default function App() {
 
           {selected && (halos.get(selected)?.length ?? 0) > 0 ? (
             <p className="collapsed">
-              <b>{fmt(halos.get(selected)?.reduce((n, h) => n + h.n, 0) ?? 0)}</b>{' '}
+              <b>{halos.get(selected)?.reduce((n, h) => n + h.n, 0) ?? 0}</b>{' '}
               {(halos.get(selected)?.reduce((n, h) => n + h.n, 0) ?? 0) === 1 ? 'node is' : 'nodes are'}{' '}
               folded here
               {halos.get(selected)?.map((h) => (
                 <span className="halo-kind" key={h.kind} style={{ color: h.color }}>
                   {' '}
-                  {fmt(h.n)} {h.kind}
+                  {h.n} {h.kind}
                 </span>
               ))}{' '}
               —{' '}
