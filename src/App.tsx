@@ -116,7 +116,8 @@ export default function App() {
   const [hoverEdge, setHoverEdge] = useState<string | null>(null)
   /** What the reader asked to fold away, in order. The picture is derived from this list and the
    * document, never stored: same list, same picture, every time. */
-  const [foldOps, setFoldOps] = useState<string[]>([])
+  /** How many layers are folded away at each node. A fold is a walk, one layer per click. */
+  const [foldSteps, setFoldSteps] = useState<Map<string, number>>(new Map())
   /** Node kinds the reader switched off in the legend. They are folded, not filtered: their mass
    * has to go somewhere, and their relations are re-attached at their share. */
   const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(new Set())
@@ -180,12 +181,25 @@ export default function App() {
     return kg.graph.getNodeAttributes(selected) as Record<string, unknown>
   }, [kg, selected])
 
+  const stepList = useMemo(
+    () =>
+      [...foldSteps.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([id, n]) => ({ id, n })),
+    [foldSteps],
+  )
+  /** The same decisions with one node's count replaced — a node with none is added, a zero removed. */
+  const withStep = useCallback((list: { id: string; n: number }[], id: string, n: number) => {
+    const rest = list.filter((s) => s.id !== id)
+    return n > 0 ? [...rest, { id, n }].sort((a, b) => a.id.localeCompare(b.id)) : rest
+  }, [])
+
   const sim = useMemo(
     () =>
       kg
-        ? foldState(kg, { muted, ops: foldOps, kinds: hiddenKinds, foldAll })
+        ? foldState(kg, { muted, steps: stepList, kinds: hiddenKinds, foldAll })
         : { hidden: new Set<string>(), absorbed: new Map(), virtual: [], stuck: new Set<string>() },
-    [kg, muted, foldOps, hiddenKinds, foldAll],
+    [kg, muted, stepList, hiddenKinds, foldAll],
   )
   const hidden = useMemo(() => new Set<string>([...sim.hidden, ...calHidden]), [sim, calHidden])
 
@@ -324,40 +338,85 @@ export default function App() {
    * What the button would do, before it is pressed. A fold that puts nothing away is not an
    * action, and a button that silently does nothing is a bug report waiting to happen.
    */
+  const stepsOf = useCallback((id: string) => foldSteps.get(id) ?? 0, [foldSteps])
+
+  const diffKinds = useCallback(
+    (after: { hidden: Set<string> }, before: { hidden: Set<string> }) => {
+      const byKind = new Map<string, number>()
+      after.hidden.forEach((id) => {
+        if (before.hidden.has(id)) return
+        const kind = (kg?.graph.getNodeAttribute(id, 'kind') as string | undefined) ?? 'node'
+        byKind.set(kind, (byKind.get(kind) ?? 0) + 1)
+      })
+      return byKind
+    },
+    [kg],
+  )
+
+  /** The next layer, as it would be if the fold button were pressed once. */
   const foldPreview = useMemo(() => {
     if (!kg || !selected || sim.hidden.has(selected)) return null
-    const after = foldState(kg, { muted, ops: [...foldOps, selected], kinds: hiddenKinds, foldAll })
-    const byKind = new Map<string, number>()
-    after.hidden.forEach((id) => {
-      if (sim.hidden.has(id)) return
-      const kind = (kg.graph.getNodeAttribute(id, 'kind') as string | undefined) ?? 'node'
-      byKind.set(kind, (byKind.get(kind) ?? 0) + 1)
+    const n = stepsOf(selected)
+    const after = foldState(kg, {
+      muted,
+      steps: withStep(stepList, selected, n + 1),
+      kinds: hiddenKinds,
+      foldAll,
     })
-    const n = [...byKind.values()].reduce((x, y) => x + y, 0)
-    return { n, byKind }
-  }, [kg, muted, foldOps, hiddenKinds, foldAll, selected, sim])
+    return { n: after.hidden.size - sim.hidden.size, byKind: diffKinds(after, sim) }
+  }, [kg, muted, stepList, stepsOf, hiddenKinds, foldAll, selected, sim, diffKinds])
+
+  /** The last layer folded at this node, as it would be if unfold were pressed once. */
+  const unfoldPreview = useMemo(() => {
+    if (!kg || !selected) return null
+    const n = stepsOf(selected)
+    if (n === 0) return null
+    const before = foldState(kg, {
+      muted,
+      steps: withStep(stepList, selected, n - 1),
+      kinds: hiddenKinds,
+      foldAll,
+    })
+    return { n: sim.hidden.size - before.hidden.size, byKind: diffKinds(sim, before) }
+  }, [kg, muted, stepList, stepsOf, hiddenKinds, foldAll, selected, sim, diffKinds])
 
   /** "2 nodes (1 paper, 1 scientist)" — the count alone made the second one look like a bug. */
-  const previewText = useMemo(() => {
-    if (!foldPreview) return ''
-    const parts = [...foldPreview.byKind.entries()]
+  const say = useCallback((p: { n: number; byKind: Map<string, number> } | null) => {
+    if (!p) return ''
+    const parts = [...p.byKind.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([kind, n]) => `${n} ${kind}${n === 1 ? '' : 's'}`)
-    return `${foldPreview.n} node${foldPreview.n === 1 ? '' : 's'}${parts.length ? ` (${parts.join(', ')})` : ''}`
-  }, [foldPreview])
+    return `${p.n} node${p.n === 1 ? '' : 's'}${parts.length ? ` (${parts.join(', ')})` : ''}`
+  }, [])
 
   const fold = useCallback((id: string) => {
-    setFoldOps((ops) => (ops.includes(id) ? ops : [...ops, id]))
+    setFoldSteps((prev) => {
+      const next = new Map(prev)
+      next.set(id, (next.get(id) ?? 0) + 1)
+      return next
+    })
     setSelected(id)
   }, [])
 
+  /** One layer back, not the whole branch. */
   const unfold = useCallback((id: string) => {
-    setFoldOps((ops) => ops.filter((r) => r !== id))
+    setFoldSteps((prev) => {
+      const n = prev.get(id) ?? 0
+      const next = new Map(prev)
+      if (n <= 1) next.delete(id)
+      else next.set(id, n - 1)
+      return next
+    })
   }, [])
 
   /** Bring back what is folded inside one node, without touching the rest of the map. */
   const showInside = useCallback((id: string) => {
-    setFoldOps((ops) => ops.filter((r) => r !== id))
+    setFoldSteps((prev) => {
+      if (!prev.has(id)) return prev
+      const next = new Map(prev)
+      next.delete(id)
+      return next
+    })
     setCalHosts((prev) => {
       if (!prev.has(id)) return prev
       const next = new Map(prev)
@@ -375,7 +434,7 @@ export default function App() {
   }, [])
 
   const revealAll = useCallback(() => {
-    setFoldOps([])
+    setFoldSteps(new Map())
     setFoldAll(false)
     setHiddenKinds(new Set())
     setCalHidden(new Set())
@@ -406,7 +465,7 @@ export default function App() {
     if (!selected || lastSelected.current === selected) return
     lastSelected.current = selected
     if (!hidden.has(selected)) return
-    setFoldOps([])
+    setFoldSteps(new Map())
     setCalHidden((h) => {
       if (!h.has(selected)) return h
       const out = new Set(h)
@@ -543,7 +602,11 @@ export default function App() {
   if (!kg) return <div className="app" />
 
   return (
-    <div className="app" data-fold-ops={foldOps.join(",")} data-hidden={hidden.size}>
+    <div
+      className="app"
+      data-fold-ops={stepList.map((s) => `${s.id}:${s.n}`).join(",")}
+      data-hidden={hidden.size}
+    >
       <header className="bar">
         <span className="title">{kg.meta.title ?? 'knowledge graph'}</span>
         <span className="count">
@@ -574,7 +637,7 @@ export default function App() {
             notes
           </button>
         ) : null}
-        {foldOps.length > 0 || hiddenKinds.size > 0 || calHosts.size > 0 || foldAll ? (
+        {foldSteps.size > 0 || hiddenKinds.size > 0 || calHosts.size > 0 || foldAll ? (
           <button onClick={revealAll}>show all</button>
         ) : null}
         <button onClick={() => setFit((n) => n + 1)}>fit</button>
@@ -809,27 +872,32 @@ export default function App() {
           {/* What this node has hidden inside it, said out loud: a folded map that does not say
               what it is hiding is a lie about the map. Counts can be fractional: a scientist
               shared by two papers is half in each orbit. */}
+          {/* Two rows, each one only when it has something to do: a button that cannot act is not
+              a control, it is furniture. Each row says what it would move. */}
           {selected ? (
-            <p className="foldbar" data-fold-preview={foldPreview?.n ?? ''}>
-              <button
-                className="tiny"
-                data-fold-action="fold"
-                disabled={(foldPreview?.n ?? 0) === 0}
-                onClick={() => fold(selected)}
-              >
-                fold
-              </button>
-              {foldOps.includes(selected) || (halos.get(selected)?.length ?? 0) > 0 ? (
-                <button className="tiny" data-fold-action="unfold" onClick={() => unfold(selected)}>
-                  unfold
-                </button>
+            <div className="foldbars" data-fold-preview={foldPreview?.n ?? ''} data-unfold-preview={unfoldPreview?.n ?? ''}>
+              {(foldPreview?.n ?? 0) > 0 ? (
+                <p className="foldbar">
+                  <button className="tiny" data-fold-action="fold" onClick={() => fold(selected)}>
+                    fold
+                  </button>
+                  <span>{`put away ${say(foldPreview)}`}</span>
+                </p>
               ) : null}
-              <span>
-                {(foldPreview?.n ?? 0) === 0
-                  ? 'nothing below this node — it is the end of its branch'
-                  : `put away ${previewText}`}
-              </span>
-            </p>
+              {unfoldPreview ? (
+                <p className="foldbar">
+                  <button className="tiny" data-fold-action="unfold" onClick={() => unfold(selected)}>
+                    unfold
+                  </button>
+                  <span>{`bring back ${say(unfoldPreview)}`}</span>
+                </p>
+              ) : null}
+              {(foldPreview?.n ?? 0) === 0 && !unfoldPreview ? (
+                <p className="foldbar">
+                  <span>nothing below this node and nothing folded here</span>
+                </p>
+              ) : null}
+            </div>
           ) : null}
 
           {selected && (halos.get(selected)?.length ?? 0) > 0 ? (

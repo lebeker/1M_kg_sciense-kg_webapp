@@ -1,21 +1,23 @@
 import { type Kg, relationOf, weightOf } from './kg'
 
 /**
- * Folding, as a pure function of the document and a list of decisions.
+ * Folding, as a pure function of the document and the decisions taken on it.
  *
- * **One rule, no exceptions.** A node's children are its neighbours at a *deeper* `level`.
- * Folding a node hides everything below it, leaves first — papers, people, and the labs and
- * companies those people work at. If the node has nothing below it, the node itself goes up into
- * the node above it. There is no per-kind and no per-relation exception: an exception is exactly
- * what made this look random before, and this file used to carry two of them.
+ * **One click, one layer.** Folding a category puts away the papers directly under it; the next
+ * click puts away the people under those papers; then the labs. Not the whole branch at once — a
+ * reader watching a branch shrink can follow what happened, and a reader who wants the whole map
+ * flat has "only categories".
+ *
+ * **The axis is `level`.** A node's children are its neighbours at a *deeper* level. A folded
+ * node's children are re-hung on the node's parents, counted, so the next layer is reachable and
+ * the branch keeps shrinking in the same place.
  *
  * Two properties matter more than anything clever:
  *
- * - **Deterministic.** Same document, same decisions, same picture. Work is ordered by depth and
+ * - **Deterministic.** Same document, same decisions, same picture: work is ordered by depth and
  *   then by id, so the order clicks arrived in cannot change the result.
- * - **Nothing invented.** A node's mass is split evenly between the parents it goes into (`+0.5`
- *   of a scientist each, when two papers share him). Two nodes still on the map are joined only by
- *   what they genuinely share, counted once per shared thing.
+ * - **Nothing invented.** A node's mass is split evenly between the parents it goes into. Two nodes
+ *   still on the map are joined only by what they actually share, counted once per shared thing.
  */
 
 export type Absorbed = {
@@ -28,6 +30,9 @@ export type Absorbed = {
 }
 
 export type VirtualEdge = { a: string; b: string; power: number; label: string }
+
+/** How many layers the reader has folded away at one node. */
+export type FoldStep = { id: string; n: number }
 
 export type FoldState = {
   hidden: Set<string>
@@ -118,25 +123,45 @@ export function subtreeOf(kg: Kg, root: string, muted: Set<string>): string[] {
 
 export function foldState(
   kg: Kg,
-  opts: { muted: Set<string>; ops: string[]; kinds: Set<string>; foldAll?: boolean },
+  opts: { muted: Set<string>; steps: FoldStep[]; kinds: Set<string>; foldAll?: boolean },
 ): FoldState {
-  const { muted, ops, kinds, foldAll } = opts
+  const { muted, steps, kinds, foldAll } = opts
   const adj = buildAdj(kg, muted)
   const hidden = new Set<string>()
   const absorbed = new Map<string, Absorbed>()
   const virtualBy = new Map<string, VirtualEdge>()
   const stuck = new Set<string>()
+  /** Lines this fold invented; a later layer has to be able to walk them. */
+  const peers = new Map<string, Map<string, Rel>>()
 
   const visible = (id: string) => adj.has(id) && !hidden.has(id)
-  const neighbours = (id: string) => [...(adj.get(id)?.keys() ?? [])].filter(visible)
+  const link = (a: string, b: string, r: Rel) => {
+    const m = peers.get(a) ?? new Map<string, Rel>()
+    m.set(b, r)
+    peers.set(a, m)
+  }
+  const neighbours = (id: string): string[] => {
+    const out = new Set<string>()
+    adj.get(id)?.forEach((_r, n) => {
+      if (visible(n)) out.add(n)
+    })
+    peers.get(id)?.forEach((_r, n) => {
+      if (visible(n)) out.add(n)
+    })
+    return [...out]
+  }
+  const relBetween = (a: string, b: string): Rel =>
+    peers.get(a)?.get(b) ?? adj.get(a)?.get(b) ?? { power: 1, label: 'related' }
   const parentsOf = (id: string) => neighbours(id).filter((n) => levelOf(kg, n) < levelOf(kg, id))
+  const childrenOf = (id: string) => neighbours(id).filter((n) => levelOf(kg, n) > levelOf(kg, id))
 
   /**
-   * Fold one node away, into the nodes above it. Its weight and everything it already absorbed
-   * split evenly between them: a scientist shared by two papers is half in each of their orbits,
-   * and the two labs he works at are half a lab on each paper too. Nothing is re-attached behind
-   * his back — whatever is below him is folded into him first, so what leaves the map is exactly
-   * what he contained.
+   * Fold one node away, into the nodes above it.
+   *
+   * Its weight and whatever it already absorbed split evenly between the parents — a scientist
+   * shared by two papers is half in each of their orbits. Its own children do not vanish with it:
+   * they re-hang on the parents at that same share, so the layer below is still there to fold on
+   * the next click and the branch keeps shrinking where the reader is looking.
    */
   const foldOne = (id: string): boolean => {
     const parents = parentsOf(id)
@@ -149,10 +174,13 @@ export function foldState(
     const mass = weightOf(kg, id) + (mine?.mass ?? 0)
     const byKind = new Map(mine?.byKind ?? [])
     byKind.set(kindOf(kg, id), (byKind.get(kindOf(kg, id)) ?? 0) + 1)
+    const kids = childrenOf(id)
 
     hidden.add(id)
     for (const n of [...(adj.get(id)?.keys() ?? [])]) adj.get(n)?.delete(id)
     adj.delete(id)
+    peers.delete(id)
+
     for (const p of parents) {
       const at =
         absorbed.get(p) ?? { mass: 0, items: new Set<string>(), byKind: new Map<string, number>() }
@@ -162,22 +190,57 @@ export function foldState(
       mine?.items.forEach((it) => at.items.add(it))
       absorbed.set(p, at)
     }
+
+    for (const c of kids) {
+      const rel = relBetween(id, c)
+      const share = Math.round((rel.power / k) * 100) / 100
+      for (const p of parents) {
+        const r = { power: share, label: rel.label }
+        link(c, p, r)
+        link(p, c, r)
+        const [a, b] = c < p ? [c, p] : [p, c]
+        const key = `${a}|${b}|${rel.label}`
+        const at = virtualBy.get(key)
+        if (at) at.power = Math.round((at.power + share) * 100) / 100
+        else virtualBy.set(key, { a, b, power: share, label: rel.label })
+      }
+    }
+
     absorbed.delete(id)
     return true
   }
 
-  /**
-   * Folding a node means folding **what it holds first, then itself if it can go up**. Skipping
-   * the first half is what made the map inconsistent: a scientist with a parent folded alone and
-   * left her company standing, while a concept with no parent swept its whole branch. Same click,
-   * two different results, and no way for a reader to know which one they were about to get.
-   */
-  const foldInto = (root: string) => {
-    const sub = subtreeOf(kg, root, muted).sort(
-      (a, b) => levelOf(kg, b) - levelOf(kg, a) || a.localeCompare(b),
-    )
-    for (const id of sub) if (visible(id)) foldOne(id)
-    if (parentsOf(root).length) foldOne(root)
+  /** The next single layer under a node — its shallowest visible descendants. */
+  const nextLayer = (root: string): string[] => {
+    const seen = new Set<string>([root])
+    let frontier = [root]
+    while (frontier.length) {
+      const deeper: string[] = []
+      for (const id of frontier) {
+        for (const n of neighbours(id)) {
+          if (seen.has(n)) continue
+          if (levelOf(kg, n) <= levelOf(kg, id)) continue
+          seen.add(n)
+          deeper.push(n)
+        }
+      }
+      if (deeper.length) return deeper.sort((a, b) => a.localeCompare(b))
+      frontier = deeper
+    }
+    return []
+  }
+
+  /** One click at a node: the layer below it. With nothing below, the node itself goes up. */
+  const foldStep = (root: string): boolean => {
+    const layer = nextLayer(root)
+    if (layer.length) {
+      let any = false
+      for (const id of layer) if (visible(id)) any = foldOne(id) || any
+      return any
+    }
+    if (parentsOf(root).length) return foldOne(root)
+    stuck.add(root)
+    return false
   }
 
   if (foldAll) {
@@ -196,9 +259,9 @@ export function foldState(
     for (const id of ids) if (visible(id)) foldOne(id)
   }
 
-  for (const root of ops) {
-    if (!kg.graph.hasNode(root) || !visible(root)) continue
-    foldInto(root)
+  for (const step of steps) {
+    if (!kg.graph.hasNode(step.id) || !visible(step.id)) continue
+    for (let i = 0; i < step.n; i += 1) if (!foldStep(step.id)) break
   }
 
   // A kind switched off in the legend is folded the same way: deepest first.
