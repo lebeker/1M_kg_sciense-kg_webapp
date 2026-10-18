@@ -22,6 +22,8 @@ import { type Kg, relationOf, weightOf } from './kg'
 export type Absorbed = {
   /** The weight that came in — what the ring around the node is made of. */
   mass: number
+  /** The nodes folded inside, by id: what two hosts can share. */
+  items: Set<string>
   /** How much of each kind is folded inside it. Fractional, because a split node is half here. */
   byKind: Map<string, number>
 }
@@ -151,15 +153,17 @@ export function subtreeOf(kg: Kg, root: string, muted: Set<string>, attributes =
 
 export function foldState(
   kg: Kg,
-  opts: { muted: Set<string>; ops: string[]; kinds: Set<string> },
+  opts: { muted: Set<string>; ops: string[]; kinds: Set<string>; foldAll?: boolean },
 ): FoldState {
-  const { muted, ops, kinds } = opts
+  const { muted, ops, kinds, foldAll } = opts
   const attributes = new Set<string>([...ATTRIBUTE_RELATIONS])
   for (const w of kg.meta?.visuals?.attributes ?? []) attributes.add(String(w).toLowerCase())
   const { tree: adj, attr } = buildAdj(kg, muted, attributes)
   const hidden = new Set<string>()
   const absorbed = new Map<string, Absorbed>()
   const virtualBy = new Map<string, VirtualEdge>()
+  /** Lines this fold invented, so the next step can move them up just like a real relation. */
+  const peers = new Map<string, Map<string, Rel>>()
   const stuck = new Set<string>()
 
   const visible = (id: string) => adj.has(id) && !hidden.has(id)
@@ -196,25 +200,32 @@ export function foldState(
     // Those stay on the map; the fold moves them up with it, at the node's share. A tree child
     // that is still visible (a fold started in the middle of a branch) is treated the same way:
     // it re-hangs on the parents instead of being orphaned.
-    const survivors = [...(attr.get(id)?.keys() ?? []), ...childrenOf(id)]
+    const survivors = [
+      ...(attr.get(id)?.keys() ?? []),
+      ...(peers.get(id)?.keys() ?? []),
+      ...childrenOf(id),
+    ]
       .filter(visible)
       .filter((c) => !parents.includes(c))
       .map((c) => ({
         c,
-        power: attr.get(id)?.get(c)?.power ?? adj.get(id)?.get(c)?.power ?? 1,
-        label: attr.get(id)?.get(c)?.label ?? adj.get(id)?.get(c)?.label ?? 'related',
+        power: attr.get(id)?.get(c)?.power ?? peers.get(id)?.get(c)?.power ?? adj.get(id)?.get(c)?.power ?? 1,
+        label: attr.get(id)?.get(c)?.label ?? peers.get(id)?.get(c)?.label ?? adj.get(id)?.get(c)?.label ?? 'related',
       }))
 
     const below = childrenOf(id)
     hidden.add(id)
     adj.delete(id)
     attr.delete(id)
+    peers.delete(id)
     for (const n of [...below]) adj.get(n)?.delete(id)
     for (const p of parents) {
       adj.get(p)?.delete(id)
-      const at = absorbed.get(p) ?? { mass: 0, byKind: new Map<string, number>() }
+      const at = absorbed.get(p) ?? { mass: 0, items: new Set<string>(), byKind: new Map<string, number>() }
       at.mass += mass / k
       byKind.forEach((n, kd) => at.byKind.set(kd, (at.byKind.get(kd) ?? 0) + n / k))
+      at.items.add(id)
+      mine?.items.forEach((it) => at.items.add(it))
       absorbed.set(p, at)
     }
     for (const { c, power, label } of survivors) {
@@ -223,10 +234,17 @@ export function foldState(
         // parallel ones: the share is summed per pair.
         const [a, b] = c < p ? [c, p] : [p, c]
         const key = `${a}|${b}|${label}`
-        const share = power / k
+        const share = Math.round((power / k) * 100) / 100
         const at = virtualBy.get(key)
-        if (at) at.power += share
+        if (at) at.power = Math.round((at.power + share) * 100) / 100
         else virtualBy.set(key, { a, b, power: share, label })
+        const link = (x: string, y: string) => {
+          const m = peers.get(x) ?? new Map()
+          m.set(y, { power: share, label })
+          peers.set(x, m)
+        }
+        link(a, b)
+        link(b, a)
         // And it joins the simulation, so a later fold in the same pass sees it: folding a paper
         // after its scientist must carry the scientist's institution up again, not drop it.
         if (attr.has(c) && attr.has(p)) {
@@ -252,6 +270,22 @@ export function foldState(
     for (const id of sub) if (visible(id)) foldOne(id)
   }
 
+  if (foldAll) {
+    // Fold the map up to its categories: every node that is not on the top layer goes into the
+    // layer above it, deepest first. What is left is the category graph, each node carrying what
+    // it absorbed.
+    let top = Number.POSITIVE_INFINITY
+    kg.graph.forEachNode((id) => {
+      top = Math.min(top, levelOf(kg, id))
+    })
+    const ids: string[] = []
+    kg.graph.forEachNode((id) => {
+      if (levelOf(kg, id) > top) ids.push(id)
+    })
+    ids.sort((a, b) => levelOf(kg, b) - levelOf(kg, a) || a.localeCompare(b))
+    for (const id of ids) if (visible(id)) foldOne(id)
+  }
+
   for (const root of ops) {
     if (!kg.graph.hasNode(root) || !visible(root)) continue
     foldInto(root)
@@ -271,5 +305,35 @@ export function foldState(
     for (const id of ids) if (visible(id)) foldOne(id)
   }
 
+  // What two surviving nodes have in common, counted once per item: two categories that share three
+  // people are joined by `shares scientist ×3`. Derived from the item sets, never from the number of
+  // paths between them — a shared lab is one shared lab, however many people it took to say so.
+  const hostsOf = new Map<string, Set<string>>()
+  absorbed.forEach((a, host) => {
+    a.items.forEach((item) => {
+      if (hidden.has(item)) {
+        const at = hostsOf.get(item) ?? new Set<string>()
+        at.add(host)
+        hostsOf.set(item, at)
+      }
+    })
+  })
+  const shares = new Map<string, { a: string; b: string; n: number; kind: string }>()
+  hostsOf.forEach((hosts, item) => {
+    if (hosts.size < 2) return
+    const list = [...hosts].sort()
+    const kind = kindOf(kg, item)
+    for (let i = 0; i < list.length; i += 1) {
+      for (let j = i + 1; j < list.length; j += 1) {
+        const key = `${list[i]}|${list[j]}|${kind}`
+        const at = shares.get(key)
+        if (at) at.n += 1
+        else shares.set(key, { a: list[i], b: list[j], n: 1, kind })
+      }
+    }
+  })
+  for (const { a, b, n, kind } of shares.values()) {
+    virtualBy.set(`share|${a}|${b}|${kind}`, { a, b, power: n, label: `shares ${kind}` })
+  }
   return { hidden, absorbed, virtual: [...virtualBy.values()], stuck }
 }

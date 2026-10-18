@@ -120,6 +120,8 @@ export default function App() {
   /** Node kinds the reader switched off in the legend. They are folded, not filtered: their mass
    * has to go somewhere, and their relations are re-attached at their share. */
   const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(new Set())
+  /** Fold the whole map up to its top layer: the categories and nothing else. */
+  const [foldAll, setFoldAll] = useState(false)
   /** Nodes the *host budget* put away — a different mechanism with a different promise. */
   const [calHidden, setCalHidden] = useState<Set<string>>(new Set())
   const [calHosts, setCalHosts] = useState<Map<string, Set<string>>>(new Map())
@@ -181,9 +183,9 @@ export default function App() {
   const sim = useMemo(
     () =>
       kg
-        ? foldState(kg, { muted, ops: foldOps, kinds: hiddenKinds })
+        ? foldState(kg, { muted, ops: foldOps, kinds: hiddenKinds, foldAll })
         : { hidden: new Set<string>(), absorbed: new Map(), virtual: [], stuck: new Set<string>() },
-    [kg, muted, foldOps, hiddenKinds],
+    [kg, muted, foldOps, hiddenKinds, foldAll],
   )
   const hidden = useMemo(() => new Set<string>([...sim.hidden, ...calHidden]), [sim, calHidden])
 
@@ -317,9 +319,9 @@ export default function App() {
    */
   const foldPreview = useMemo(() => {
     if (!kg || !selected || sim.hidden.has(selected)) return null
-    const after = foldState(kg, { muted, ops: [...foldOps, selected], kinds: hiddenKinds })
+    const after = foldState(kg, { muted, ops: [...foldOps, selected], kinds: hiddenKinds, foldAll })
     return after.hidden.size - sim.hidden.size
-  }, [kg, muted, foldOps, hiddenKinds, selected, sim])
+  }, [kg, muted, foldOps, hiddenKinds, foldAll, selected, sim])
 
   const fold = useCallback((id: string) => {
     setFoldOps((ops) => (ops.includes(id) ? ops : [...ops, id]))
@@ -354,6 +356,7 @@ export default function App() {
 
   const revealAll = useCallback(() => {
     setFoldOps([])
+    setFoldAll(false)
     setHiddenKinds(new Set())
     setCalHidden(new Set())
     setCalHosts(new Map())
@@ -551,7 +554,7 @@ export default function App() {
             notes
           </button>
         ) : null}
-        {foldOps.length > 0 || hiddenKinds.size > 0 || calHosts.size > 0 ? (
+        {foldOps.length > 0 || hiddenKinds.size > 0 || calHosts.size > 0 || foldAll ? (
           <button onClick={revealAll}>show all</button>
         ) : null}
         <button onClick={() => setFit((n) => n + 1)}>fit</button>
@@ -649,7 +652,17 @@ export default function App() {
               smaller, the document is not — and the icon is what says so. */}
           {kinds.length > 0 && (
             <>
-              <h4>nodes</h4>
+              <h4>
+                nodes
+                <button
+                  className="link"
+                  data-fold-all={foldAll ? 'on' : 'off'}
+                  title="put away everything that is not a category — people, papers, labs — and keep what each category absorbed"
+                  onClick={() => setFoldAll((v) => !v)}
+                >
+                  {foldAll ? 'unfold' : 'only categories'}
+                </button>
+              </h4>
               <ul className="rels">
                 {kinds.slice(0, 12).map((k) => {
                   const off = hiddenKinds.has(k.kind)
