@@ -327,8 +327,24 @@ export default function App() {
   const foldPreview = useMemo(() => {
     if (!kg || !selected || sim.hidden.has(selected)) return null
     const after = foldState(kg, { muted, ops: [...foldOps, selected], kinds: hiddenKinds, foldAll })
-    return after.hidden.size - sim.hidden.size
+    const byKind = new Map<string, number>()
+    after.hidden.forEach((id) => {
+      if (sim.hidden.has(id)) return
+      const kind = (kg.graph.getNodeAttribute(id, 'kind') as string | undefined) ?? 'node'
+      byKind.set(kind, (byKind.get(kind) ?? 0) + 1)
+    })
+    const n = [...byKind.values()].reduce((x, y) => x + y, 0)
+    return { n, byKind }
   }, [kg, muted, foldOps, hiddenKinds, foldAll, selected, sim])
+
+  /** "2 nodes (1 paper, 1 scientist)" — the count alone made the second one look like a bug. */
+  const previewText = useMemo(() => {
+    if (!foldPreview) return ''
+    const parts = [...foldPreview.byKind.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([kind, n]) => `${n} ${kind}${n === 1 ? '' : 's'}`)
+    return `${foldPreview.n} node${foldPreview.n === 1 ? '' : 's'}${parts.length ? ` (${parts.join(', ')})` : ''}`
+  }, [foldPreview])
 
   const fold = useCallback((id: string) => {
     setFoldOps((ops) => (ops.includes(id) ? ops : [...ops, id]))
@@ -794,20 +810,24 @@ export default function App() {
               what it is hiding is a lie about the map. Counts can be fractional: a scientist
               shared by two papers is half in each orbit. */}
           {selected ? (
-            <p className="foldbar" data-fold-preview={foldPreview ?? ''}>
+            <p className="foldbar" data-fold-preview={foldPreview?.n ?? ''}>
               <button
                 className="tiny"
-                disabled={!foldOps.includes(selected) && foldPreview === 0}
-                onClick={() => (foldOps.includes(selected) ? unfold(selected) : fold(selected))}
+                data-fold-action="fold"
+                disabled={(foldPreview?.n ?? 0) === 0}
+                onClick={() => fold(selected)}
               >
-                {foldOps.includes(selected) ? 'unfold' : 'fold'}
+                fold
               </button>
+              {foldOps.includes(selected) || (halos.get(selected)?.length ?? 0) > 0 ? (
+                <button className="tiny" data-fold-action="unfold" onClick={() => unfold(selected)}>
+                  unfold
+                </button>
+              ) : null}
               <span>
-                {foldOps.includes(selected)
-                  ? 'everything under this node is put away'
-                  : foldPreview === 0
-                    ? 'nothing below this node to put away — it is the end of its branch'
-                    : `put away ${foldPreview ?? '…'} node${foldPreview === 1 ? '' : 's'} below this one`}
+                {(foldPreview?.n ?? 0) === 0
+                  ? 'nothing below this node — it is the end of its branch'
+                  : `put away ${previewText}`}
               </span>
             </p>
           ) : null}

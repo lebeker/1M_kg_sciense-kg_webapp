@@ -1,6 +1,5 @@
 import Graph from 'graphology'
 import forceAtlas2 from 'graphology-layout-forceatlas2'
-import random from 'graphology-layout/random'
 
 /**
  * kg/1 is the document format. The skill writes it, this app reads it.
@@ -216,14 +215,24 @@ export function ensurePositions(kg: Kg): 'authored' | 'rings' | 'computed' {
     return 'rings'
   }
 
-  if (given === 0) {
-    random.assign(g, { scale: 100 })
-  } else {
-    g.forEachNode((id, a) => {
-      if (placed(a)) return
-      g.mergeNodeAttributes(id, { x: Math.random() * 100, y: Math.random() * 100 })
-    })
+  // Deterministic start. `random.assign` and `Math.random` made the same document come out as a
+  // different picture on every reload — a graph that moves when nothing changed reads as a bug,
+  // and it makes two sessions impossible to compare. The seed is the node's id, so the same
+  // document always lands in the same layout.
+  const seedOf = (id: string): number => {
+    let h = 2166136261
+    for (let i = 0; i < id.length; i += 1) {
+      h ^= id.charCodeAt(i)
+      h = Math.imul(h, 16777619)
+    }
+    return (h >>> 0) / 4294967296
   }
+  g.forEachNode((id, a) => {
+    if (placed(a)) return
+    const sx = seedOf(`${id}|x`)
+    const sy = seedOf(`${id}|y`)
+    g.mergeNodeAttributes(id, { x: (sx - 0.5) * 100, y: (sy - 0.5) * 100 })
+  })
 
   forceAtlas2.assign(g, {
     iterations: n > 500 ? 60 : n > 100 ? 150 : 300,
