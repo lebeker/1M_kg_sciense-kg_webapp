@@ -1,7 +1,7 @@
 {
   "name": "kg-viewer",
   "private": true,
-  "version": "0.0.22",
+  "version": "0.0.23",
   "type": "module",
   "description": "Single-file React viewer for a kg/1 knowledge-graph document.",
   "scripts": {
