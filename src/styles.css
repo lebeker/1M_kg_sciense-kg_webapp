@@ -145,8 +145,11 @@ button {
   background: color-mix(in srgb, var(--panel) 92%, transparent);
   border: 1px solid var(--line);
   border-radius: 8px;
-  z-index: 2;
-  pointer-events: none;
+  /* Above the sigma canvases, and able to take a click: this is a control panel, not a caption.
+     (It was `pointer-events: none` — the rows looked like switches and passed every click
+     straight through to the canvas.) */
+  z-index: 6;
+  pointer-events: auto;
 }
 
 .legend li {
@@ -504,7 +507,23 @@ button.tiny:hover, button.link:hover { color: #cfe0ff; }
   width: 9px; height: 9px; border-radius: 2px; flex: none;
   border: 1px solid var(--muted-foreground); background: var(--muted-foreground);
 }
+.legend .rel .eye { display: inline-flex; flex: none; color: var(--muted-foreground); }
+.legend .rel:hover .eye { color: var(--foreground); }
+.legend .rel.off .eye { color: #b4544f; }
+.legend .rel { padding: 2px 3px; border-radius: 4px; }
+.legend .rel:hover { background: color-mix(in srgb, var(--foreground) 7%, transparent); }
 .legend .rel.off { color: var(--muted-foreground); }
 .legend .rel.off .word { text-decoration: line-through; }
 .legend .rel.off .mark { background: none; }
 .legend .rel:hover .word { color: var(--foreground); }
+
+/* The fold control sits with the node, not in a menu: one word, and what it will do. */
+.panel .foldbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.panel .foldbar .tiny { padding: 2px 8px; font-size: 11px; }
