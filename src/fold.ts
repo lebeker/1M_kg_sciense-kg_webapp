@@ -211,22 +211,18 @@ export function foldState(
   }
 
   /**
-   * Hide a node and everything under it, with no host to carry its mass: a category has nothing
-   * above it, so switching the category kind off cannot fold it *into* anything — the branch goes
-   * with it. Without this, turning `concept` off did nothing at all: every concept sat on the top
-   * layer, found no parent, and reported itself stuck.
+   * Remove one node and nothing else. A category has nothing above it, so switching the category
+   * kind off cannot fold it *into* anything — but it must not take its branch with it either.
+   * Take the concepts away and the papers are simply the top layer: nobody sits above anybody
+   * because a level says so, and whatever is left becomes the root of its own branch. Deleting a
+   * whole subtree because its parent is gone is an assumption this viewer has no business making.
    */
-  const hideBranch = (root: string) => {
-    const ids = [...subtreeOf(kg, root, muted), root].sort(
-      (a, b) => levelOf(kg, b) - levelOf(kg, a) || a.localeCompare(b),
-    )
-    for (const id of ids) {
-      if (!visible(id)) continue
-      hidden.add(id)
-      for (const n of [...(adj.get(id)?.keys() ?? [])]) adj.get(n)?.delete(id)
-      adj.delete(id)
-      peers.delete(id)
-    }
+  const hideNode = (id: string) => {
+    if (!visible(id)) return
+    hidden.add(id)
+    for (const n of [...(adj.get(id)?.keys() ?? [])]) adj.get(n)?.delete(id)
+    adj.delete(id)
+    peers.delete(id)
   }
 
   /** The next single layer under a node — its shallowest visible descendants. */
@@ -295,7 +291,7 @@ export function foldState(
     ids.sort((a, b) => levelOf(kg, b) - levelOf(kg, a) || a.localeCompare(b))
     for (const id of ids) {
       if (!visible(id)) continue
-      if (!foldOne(id)) hideBranch(id)
+      if (!foldOne(id)) hideNode(id)
     }
   }
 
