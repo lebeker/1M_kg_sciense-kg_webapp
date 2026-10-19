@@ -439,12 +439,30 @@ export function toKg(doc: KgJson): Kg {
     graph.setNodeAttribute(id, 'color', palette[kind])
   })
 
+  // Relations the document *declares*: name, direction, look, and the kinds they may join.
+  // A declaration is a default the edges inherit, so a graph of 20,000 citations does not carry
+  // the same colour 20,000 times — and changing it changes every edge of that relation at once.
+  const declared = new Map<string, Record<string, unknown>>()
+  const declList = (meta as unknown as { edges?: Record<string, unknown>[] } | undefined)?.edges
+  for (const d of declList ?? []) {
+    const name = str(d?.name)
+    if (name) declared.set(name, d)
+  }
+
   let i = 0
   for (const e of doc.edges ?? []) {
     if (!e?.from || !e?.to) continue
     if (!graph.hasNode(e.from) || !graph.hasNode(e.to)) continue
     const attrs: Record<string, unknown> = {}
     const label = str(e.label), dir = str(e.dir)
+    const decl = label ? declared.get(label) : undefined
+    if (decl) {
+      for (const key of ['dir', 'color', 'style', 'power', 'dash', 'width'] as const) {
+        if (decl[key] !== undefined && (e as Record<string, unknown>)[key] === undefined) {
+          ;(e as Record<string, unknown>)[key] = decl[key]
+        }
+      }
+    }
     if (label !== undefined) attrs.label = label
     if (dir !== undefined) attrs.dir = dir
     // Same rule as nodes: an edge property the document carries is kept, not dropped because
