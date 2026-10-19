@@ -380,7 +380,9 @@ export default function App() {
       kinds: hiddenKinds,
       foldAll,
     })
-    return { n: sim.hidden.size - before.hidden.size, byKind: diffKinds(sim, before) }
+    const back = sim.hidden.size - before.hidden.size
+    // Nothing to give back — its host is not on the map, or the step never took anything.
+    return back > 0 ? { n: back, byKind: diffKinds(sim, before) } : null
   }, [kg, muted, stepList, stepsOf, hiddenKinds, foldAll, selected, sim, diffKinds])
 
   /** "2 nodes (1 paper, 1 scientist)" — the count alone made the second one look like a bug. */
@@ -928,7 +930,11 @@ export default function App() {
               ) : null}
               {(foldPreview?.n ?? 0) === 0 && !unfoldPreview ? (
                 <p className="foldbar">
-                  <span>nothing below this node and nothing folded here</span>
+                  <span>
+                    {sim.hidden.has(selected)
+                      ? 'this node is switched off'
+                      : 'nothing below this node and nothing folded here'}
+                  </span>
                 </p>
               ) : null}
             </div>

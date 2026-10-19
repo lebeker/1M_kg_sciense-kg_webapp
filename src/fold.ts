@@ -258,6 +258,26 @@ export function foldState(
     return false
   }
 
+  // Order matters, and it is the order the reader sees: a kind switched off goes first, so a node
+  // it removes cannot fold anything into itself and take that with it. Turning the concepts off
+  // after folding a concept's papers used to lose the papers too — they were inside the host when
+  // the host was dropped. Kinds first, then the map-wide fold, then the reader's own steps.
+  // A kind switched off in the legend is folded the same way: deepest first.
+  const byKindIds = new Map<string, string[]>()
+  kg.graph.forEachNode((id) => {
+    if (!kinds.has(kindOf(kg, id))) return
+    const at = byKindIds.get(kindOf(kg, id)) ?? []
+    at.push(id)
+    byKindIds.set(kindOf(kg, id), at)
+  })
+  for (const [, ids] of byKindIds) {
+    ids.sort((a, b) => levelOf(kg, b) - levelOf(kg, a) || a.localeCompare(b))
+    for (const id of ids) {
+      if (!visible(id)) continue
+      if (!foldOne(id)) hideNode(id)
+    }
+  }
+
   if (foldAll) {
     // Fold the map up to its categories: every node that is not on the top layer goes into the
     // layer above it, deepest first. What is left is the category graph, each node carrying what
@@ -277,22 +297,6 @@ export function foldState(
   for (const step of steps) {
     if (!kg.graph.hasNode(step.id) || !visible(step.id)) continue
     for (let i = 0; i < step.n; i += 1) if (!foldStep(step.id)) break
-  }
-
-  // A kind switched off in the legend is folded the same way: deepest first.
-  const byKindIds = new Map<string, string[]>()
-  kg.graph.forEachNode((id) => {
-    if (!kinds.has(kindOf(kg, id))) return
-    const at = byKindIds.get(kindOf(kg, id)) ?? []
-    at.push(id)
-    byKindIds.set(kindOf(kg, id), at)
-  })
-  for (const [, ids] of byKindIds) {
-    ids.sort((a, b) => levelOf(kg, b) - levelOf(kg, a) || a.localeCompare(b))
-    for (const id of ids) {
-      if (!visible(id)) continue
-      if (!foldOne(id)) hideNode(id)
-    }
   }
 
   // What two surviving nodes have in common, counted once per shared thing: two categories that
