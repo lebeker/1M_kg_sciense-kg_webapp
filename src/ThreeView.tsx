@@ -39,6 +39,8 @@ type Props = {
   hidden?: Set<string>
   /** What is collapsed inside a node, per kind — drawn here as a cloud with nodes in orbit. */
   halos?: Map<string, Halo[]>
+  /** Whether those clouds are drawn at all — the same switch as the 2D rings. */
+  halosOn?: boolean
   /** Relation words switched off in the legend: not drawn here either. */
   muted?: Set<string>
   /** Does a directed relation get a head by default? The graph decides. */
@@ -58,6 +60,7 @@ export default function ThreeView({
   focus,
   hidden,
   halos,
+  halosOn = true,
   muted,
   arrows = false,
   edgeScale = 1,
@@ -75,7 +78,9 @@ export default function ThreeView({
   selectRef.current = onSelect
   const observers = useRef<ResizeObserver | null>(null)
   const halosRef = useRef<Map<string, Halo[]>>(new Map())
+  const halosOnRef = useRef<boolean>(true)
   halosRef.current = halos ?? new Map()
+  halosOnRef.current = halosOn
 
   useEffect(() => {
     const el = host.current
@@ -100,6 +105,7 @@ export default function ThreeView({
          * — each at its own radius and level, so the cloud reads as a place rather than a sticker.
          */
         const cloud = (node: ForceNode) => {
+          if (!halosOnRef.current) return undefined
           const kinds = halosRef.current.get(node.id ?? '')
           if (!kinds?.length) return undefined
           const group = new THREE.Group()
@@ -200,7 +206,7 @@ export default function ThreeView({
       data.current = null
       clouds.current = []
     }
-  }, [kg, hidden, halos, muted, arrows, edgeScale])
+  }, [kg, hidden, halos, halosOn, muted, arrows, edgeScale])
 
   // Follow a connection in 3D: park the camera along the line from the origin to the node, the
   // standard way to look at one thing without losing where it is.

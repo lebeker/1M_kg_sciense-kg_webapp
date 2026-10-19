@@ -28,6 +28,8 @@ type Props = {
   hoverEdge?: string | null
   /** What is hidden around a node -> one entry per kind, for one ring each. */
   halos?: Map<string, Halo[]>
+  /** Whether those rings are drawn at all. A reader who does not care about them can turn them off. */
+  halosOn?: boolean
   /** Bumped when edges were invented or withdrawn without the document changing. */
   graphVersion?: number
   /** Relation words this view is asked not to draw. */
@@ -86,6 +88,7 @@ export default function SigmaView({
   focus,
   hoverEdge,
   halos,
+  halosOn = true,
   graphVersion,
   hidden,
   muted,
@@ -101,6 +104,7 @@ export default function SigmaView({
   const hoverRef = useRef<string | null>(null)
   const mutedRef = useRef<Set<string>>(new Set())
   const halosRef = useRef<Map<string, Halo[]>>(new Map())
+  const halosOnRef = useRef<boolean>(true)
   const hiddenRef = useRef<Set<string>>(new Set())
   const calRef = useRef<Set<string>>(new Set())
   const drawRef = useRef<() => void>(() => {})
@@ -110,6 +114,7 @@ export default function SigmaView({
   hoverRef.current = hoverEdge ?? null
   mutedRef.current = muted ?? new Set()
   halosRef.current = halos ?? new Map()
+  halosOnRef.current = halosOn !== false
   hiddenRef.current = hidden ?? new Set()
 
   // Fit, then back off a little: sigma's reset fits node centres, so a big circle or a
@@ -215,9 +220,12 @@ export default function SigmaView({
       const ratio = instance.getCamera().getState().ratio || 1
       // sigma's node shader draws `a_size / u_sizeRatio`, so a ring measured in the unscaled
       // space ends up inside the circle as soon as the reader zooms in.
+      // The radius sigma actually paints. Its node shader sets gl_PointSize = a_size / u_sizeRatio,
+      // which is a *diameter* in device pixels, so the radius is half that — the ring used to be
+      // drawn at four times the node's radius and read as a second, bigger circle.
       const radius = (id: string) => {
         const d = instance.getNodeDisplayData(id) as { size?: number } | undefined
-        return ((d?.size ?? 4) * 2) / ratio
+        return (d?.size ?? 4) / (2 * ratio)
       }
       // `hasNode` before anything else: a caller can hand over an id that is not on the map
       // (a collapse with no host, a stale selection), and asking the graph for its position
@@ -283,22 +291,28 @@ export default function SigmaView({
 
       // Rings: a node with nodes collapsed inside it says how much is hidden, and collapsing a
       // small weak thing and a large strong one should not look the same.
-      halosRef.current.forEach((kinds, id) => {
-        if (!visible(id)) return
-        const p = point(id)
-        // One ring per kind, in that kind's own colour, the heaviest closest to the node — so a
-        // collapsed company and a collapsed researcher are told apart without reading anything.
-        kinds.forEach((h, i) => {
-          ctx.save()
-          ctx.strokeStyle = h.color
-          ctx.globalAlpha = 0.75
-          ctx.lineWidth = 1.5 + Math.min(4, Math.sqrt(Math.max(0, h.mass)) * 0.7)
-          ctx.beginPath()
-          ctx.arc(p.x, p.y, radius(id) + 5 + i * 4, 0, Math.PI * 2)
-          ctx.stroke()
-          ctx.restore()
+      if (halosRef.current.size && halosOnRef.current) {
+        halosRef.current.forEach((kinds, id) => {
+          if (!visible(id)) return
+          const p = point(id)
+          const r0 = radius(id)
+          // One ring per kind, in that kind's own colour, the heaviest closest to the node — so a
+          // collapsed company and a collapsed researcher are told apart without reading anything.
+          // The ring sits *just* outside the node: two line widths of air, then one ring per kind
+          // spaced by its own width, so a ring never reads as a second, larger circle.
+          kinds.forEach((h, i) => {
+            const lw = 1.5 + Math.min(4, Math.sqrt(Math.max(0, h.mass)) * 0.7)
+            ctx.save()
+            ctx.strokeStyle = h.color
+            ctx.globalAlpha = 0.75
+            ctx.lineWidth = lw
+            ctx.beginPath()
+            ctx.arc(p.x, p.y, r0 + 2 * lw + i * (lw + 2), 0, Math.PI * 2)
+            ctx.stroke()
+            ctx.restore()
+          })
         })
-      })
+      }
     }
     drawRef.current = draw
 
@@ -330,7 +344,7 @@ export default function SigmaView({
   useEffect(() => {
     sigma.current?.refresh()
     drawRef.current()
-  }, [hidden, hoverEdge, halos, graphVersion])
+  }, [hidden, hoverEdge, halos, halosOn, graphVersion])
 
   // ── measuring this host ────────────────────────────────────────────────────────────────
   // The budget is what this machine can draw, so it is measured on this machine: the graph is
@@ -460,7 +474,9 @@ export default function SigmaView({
       data-drawn={kg.graph.order - (hidden?.size ?? 0)}
       data-collapsed={hidden?.size ?? 0}
       // how many rings are on screen, not how many nodes wear them
-      data-rings={[...(halos?.values() ?? [])].reduce((n, k) => n + k.length, 0)}
+      // how many rings are on screen, not how many nodes wear them — and none when they are off
+      data-rings={halosOn === false ? 0 : [...(halos?.values() ?? [])].reduce((n, k) => n + k.length, 0)}
+      data-halos={halosOn === false ? 'off' : 'on'}
       style={insetRight ? { width: `calc(100% - ${insetRight}px)` } : undefined}
     >
       {progress ? (

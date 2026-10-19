@@ -527,3 +527,19 @@ button.tiny:hover, button.link:hover { color: #cfe0ff; }
   color: var(--muted-foreground);
 }
 .panel .foldbar .tiny { padding: 2px 8px; font-size: 11px; }
+
+/* An icon button in the top bar: same height as the words beside it, no text. Off is dimmed, not
+   invisible — a switch you cannot find again is worse than one you left alone. */
+.bar .icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 7px;
+  color: var(--muted-foreground);
+}
+.bar .icon.off {
+  opacity: 0.45;
+}
+.bar .icon svg {
+  display: block;
+}

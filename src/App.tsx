@@ -123,6 +123,9 @@ export default function App() {
   const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(new Set())
   /** Fold the whole map up to its top layer: the categories and nothing else. */
   const [foldAll, setFoldAll] = useState(false)
+  /** Rings around a node that has nodes folded inside it. A map read for its shape does not need
+   * them; a map read for what was put away does. The reader decides, in the top bar. */
+  const [halosOn, setHalosOn] = useState(true)
   /** Nodes the *host budget* put away — a different mechanism with a different promise. */
   const [calHidden, setCalHidden] = useState<Set<string>>(new Set())
   const [calHosts, setCalHosts] = useState<Map<string, Set<string>>>(new Map())
@@ -606,6 +609,7 @@ export default function App() {
       className="app"
       data-fold-ops={stepList.map((s) => `${s.id}:${s.n}`).join(",")}
       data-hidden={hidden.size}
+      data-halos={halosOn ? 'on' : 'off'}
     >
       <header className="bar">
         <span className="title">{kg.meta.title ?? 'knowledge graph'}</span>
@@ -631,6 +635,34 @@ export default function App() {
         />
 
         <div className="spacer" />
+
+        <button
+          className={`icon${halosOn ? '' : ' off'}`}
+          data-halos-toggle={halosOn ? 'on' : 'off'}
+          aria-pressed={halosOn}
+          title={
+            halosOn
+              ? 'rings: what is folded inside a node is drawn as an orbit around it'
+              : 'rings off: a folded node is just a node'
+          }
+          onClick={() => setHalosOn((v) => !v)}
+        >
+          {/* an orbit: one body, one ring, one moon */}
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.2" fill="currentColor" />
+            <ellipse
+              cx="12"
+              cy="12"
+              rx="9"
+              ry="4.4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              transform="rotate(-24 12 12)"
+            />
+            <circle cx="19.4" cy="8.2" r="1.5" fill="currentColor" />
+          </svg>
+        </button>
 
         {overview ? (
           <button onClick={() => setDoc(overview)} title="the notes written beside this graph">
@@ -700,6 +732,7 @@ export default function App() {
             focus={focus}
             hoverEdge={hoverEdge}
             halos={halos}
+            halosOn={halosOn}
             graphVersion={graphVersion}
             hidden={hidden}
             muted={muted}
@@ -714,6 +747,7 @@ export default function App() {
               kg={kg}
               onSelect={onSelect}
               halos={halos}
+              halosOn={halosOn}
               muted={muted}
               insetRight={selected ? PANEL_PX : 0}
               focus={focus}
