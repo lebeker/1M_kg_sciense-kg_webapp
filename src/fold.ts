@@ -210,6 +210,25 @@ export function foldState(
     return true
   }
 
+  /**
+   * Hide a node and everything under it, with no host to carry its mass: a category has nothing
+   * above it, so switching the category kind off cannot fold it *into* anything — the branch goes
+   * with it. Without this, turning `concept` off did nothing at all: every concept sat on the top
+   * layer, found no parent, and reported itself stuck.
+   */
+  const hideBranch = (root: string) => {
+    const ids = [...subtreeOf(kg, root, muted), root].sort(
+      (a, b) => levelOf(kg, b) - levelOf(kg, a) || a.localeCompare(b),
+    )
+    for (const id of ids) {
+      if (!visible(id)) continue
+      hidden.add(id)
+      for (const n of [...(adj.get(id)?.keys() ?? [])]) adj.get(n)?.delete(id)
+      adj.delete(id)
+      peers.delete(id)
+    }
+  }
+
   /** The next single layer under a node — its shallowest visible descendants. */
   const nextLayer = (root: string): string[] => {
     const seen = new Set<string>([root])
@@ -274,7 +293,10 @@ export function foldState(
   })
   for (const [, ids] of byKindIds) {
     ids.sort((a, b) => levelOf(kg, b) - levelOf(kg, a) || a.localeCompare(b))
-    for (const id of ids) if (visible(id)) foldOne(id)
+    for (const id of ids) {
+      if (!visible(id)) continue
+      if (!foldOne(id)) hideBranch(id)
+    }
   }
 
   // What two surviving nodes have in common, counted once per shared thing: two categories that
