@@ -73,6 +73,24 @@ const stamp = {
   manifest_url: `https://raw.githubusercontent.com/${origin.replace('https://github.com/', '')}` +
     `/main/app.json`,
 }
+// The app catalogue names the tag the skill will fetch. It is written here, next to the viewer,
+// because a catalogue that points at last week's tag is an app that silently does not match.
+const appsPath = join(target, 'scripts', 'apps.json')
+if (existsSync(appsPath)) {
+  const apps = JSON.parse(readFileSync(appsPath, 'utf8'))
+  const repo = (origin || 'https://github.com/lebeker/1M_kg_sciense-kg_webapp')
+    .replace('https://github.com/', 'https://raw.githubusercontent.com/')
+  const fresh = `${repo}/viewer-v${pkg.version}/viewer.html`
+  let touched = 0
+  for (const app of Object.values(apps.apps ?? {})) {
+    if (typeof app?.url === 'string' && app.url.includes('/viewer-v')) {
+      app.url = fresh
+      touched++
+    }
+  }
+  if (touched) writeFileSync(appsPath, JSON.stringify(apps, null, 2) + '\n')
+}
+
 writeFileSync(join(assets, 'viewer.version'), JSON.stringify(stamp, null, 2) + '\n')
 
 console.log(`viewer.html (${stamp.bytes} bytes) -> ${join(assets, 'viewer.html')}`)
