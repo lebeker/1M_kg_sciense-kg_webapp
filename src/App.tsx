@@ -765,7 +765,9 @@ export default function App() {
         </div>
       </header>
 
-      {kg && !painted ? (
+      {/* An empty graph draws nothing, so no first frame is ever reported: the loader would sit
+          there for good, promising a layout of zero nodes. */}
+      {kg && !painted && kg.graph.order > 0 ? (
         <div className="loading" data-loading="first-frame">
           <b>laying out {kg.graph.order} nodes</b>
           <span>this page builds its own positions; nothing is being downloaded</span>
@@ -822,7 +824,9 @@ export default function App() {
 
       <div className="view">
         {kg.graph.order === 0 ? (
-          <p className="empty">no graph in this page</p>
+          <p className="empty" data-empty={kg ? 'graph' : 'none'}>
+            {kg ? 'this graph has no nodes yet' : 'no graph in this page'}
+          </p>
         ) : mode === '2d' ? (
           <SigmaView
             kg={kg}
