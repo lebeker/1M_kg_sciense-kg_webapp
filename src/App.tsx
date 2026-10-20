@@ -64,7 +64,9 @@ const CALIBRATE_OVER = 600
 /** The rows the panel lays out in its own order. Everything else a node carries is data. */
 const LAID_OUT = new Set([
   'id', 'label', 'kind', 'level', 'size', 'parent', 'tags', 'link', 'desc', 'color',
-  'style', 'x', 'y', 'doc', 'md',
+  'style', 'x', 'y', 'doc', 'md', 'desc_rev',
+  // Shown in their own row: `cited 300 · 6 here · openalex`.
+  'cited_by', 'cited_by_source', 'cited_by_at',
   // Resolved by the data layer from the edges around the node, and shown in their own rows:
   // `weight` is what the node is worth, `px` is how big that turned out on screen.
   'weight', 'weight_from', 'px',
@@ -253,6 +255,17 @@ export default function App() {
     }
     return [...by.entries()].map(([rel, conns]) => ({ rel, conns, hideable: false }))
   }, [connections])
+
+  /** How many citation edges this node already has on the map — computed, never stored: a
+   * document that has to say "6 of 300" twice will eventually disagree with itself. */
+  const citedHere = useMemo(() => {
+    if (!kg || !selected) return 0
+    let n = 0
+    kg.graph.forEachEdge(selected, (_e, a) => {
+      if (String(a.label ?? '') === 'cites') n += 1
+    })
+    return n
+  }, [kg, selected])
 
   /** What the numbers in `weight` measure, as the document itself states it. */
   const weightMetric = kg?.meta?.weight?.metric ?? 'connections'
@@ -933,18 +946,21 @@ export default function App() {
                 </span>
               ) : null}
             </dd>
-            {nodeAttrs.size != null ? (
+            {/* `size`, `level` and `parent` are the engine talking to itself: a hand-set weight,
+                a fold depth, a hierarchy slot nothing writes. They stay in the document and stay
+                out of the panel — a reader asking "what is this" is not asking for a fold depth. */}
+            {nodeAttrs.cited_by != null ? (
               <>
-                <dt>size</dt>
+                <dt>cited</dt>
                 <dd>
-                  {String(nodeAttrs.size)} <span className="from">set by hand</span>
+                  {String(nodeAttrs.cited_by)}{' '}
+                  <span className="from">
+                    {citedHere} here
+                    {nodeAttrs.cited_by_source ? ` · ${String(nodeAttrs.cited_by_source)}` : ''}
+                  </span>
                 </dd>
               </>
             ) : null}
-            <dt>level</dt>
-            <dd>{nodeAttrs.level != null ? String(nodeAttrs.level) : '—'}</dd>
-            <dt>parent</dt>
-            <dd>{nodeAttrs.parent != null ? String(nodeAttrs.parent) : '—'}</dd>
             {/* Every other property the document carried gets its own row. This panel has no
                 list of fields and never needs one: the graph says what it has, and adding a
                 property to a node is a data edit, not a change to this app. */}

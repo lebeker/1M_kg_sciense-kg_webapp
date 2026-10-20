@@ -61,6 +61,23 @@ a link: `cited_by_count: 412` from Crossref or OpenAlex must never become 412 ed
   because OpenCitations does not index this journal" is a useful answer; a silent half-graph is
   not.
 
+## The count is cheap; the list is not
+
+`cited_by_count` is **already in the record** you fetched for the paper — OpenAlex, Crossref
+(`is-referenced-by-count`) and Semantic Scholar (`citationCount`) all return it for free. Write it
+once, with its source and date:
+
+```
+kg.py add-node … --set cited_by=300 --set cited_by_source=openalex --set cited_by_at=2026-10-20
+```
+
+Never pay a search for a number a record already carries. OpenCitations gives you the citing list
+for free, and each link says whether it is an author self-citation (`author_sc`), which is the only
+cheap way to say "300 cited, 41 of them by the authors themselves". `counts_by_year` from OpenAlex
+is free too, and turns a lifetime total into a claim worth making ("41 since 2024").
+
+The viewer computes "how many of those are on this map" from the edges, so do not store it.
+
 ## Cap
 
 Default: at most 200 citing works per paper, and only papers already on the map by default. More
