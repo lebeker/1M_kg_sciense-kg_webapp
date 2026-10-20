@@ -44,6 +44,8 @@ type Props = {
   calibrating?: boolean
   /** Called once, when there is a picture: before that, whatever the page shows is a promise. */
   onFirstFrame?: () => void
+  /** Day or night, because a canvas cannot read a stylesheet. */
+  theme?: 'dark' | 'light'
   onMeasured?: (nodes: number) => void
 }
 
@@ -80,6 +82,28 @@ const SHAPES: Record<string, unknown> = {
 /** The ramp the calibration walks: node counts it shows, and holds, for a few frames each. */
 const RAMP = [200, 400, 800, 1500, 2500, 4000, 6000, 9000, 13000, 18000, 25000]
 
+/** The two palettes the canvas has to know about. Everything else reads a CSS variable. */
+const CANVAS = {
+  dark: {
+    bg: '#14161a',
+    edge: '#525c6b',
+    dim: '#333842',
+    dash: 'rgba(96,106,124,0.75)',
+    tipBg: 'rgba(16,19,25,0.94)',
+    tipFg: '#e3e9f4',
+    tipLine: 'rgba(130,150,180,0.35)',
+  },
+  light: {
+    bg: '#f7f8fa',
+    edge: '#b9c0cc',
+    dim: '#cdd3dc',
+    dash: 'rgba(150,160,175,0.95)',
+    tipBg: 'rgba(255,255,255,0.97)',
+    tipFg: '#1b1f27',
+    tipLine: '#d0d6e0',
+  },
+} as const
+
 export default function SigmaView({
   kg,
   graph,
@@ -99,6 +123,7 @@ export default function SigmaView({
   calibrating = false,
   onMeasured,
   onFirstFrame,
+  theme = 'dark',
 }: Props) {
   const host = useRef<HTMLDivElement | null>(null)
   // The effect below must not re-run when a parent re-renders and hands over a new closure.
@@ -152,8 +177,11 @@ export default function SigmaView({
       renderEdgeLabels: false,
       // #2b3038 on a #14161a page is 1.1:1 — the relations were there but unreadable. A
       // field map whose lines cannot be seen is a scatter of dots.
-      defaultEdgeColor: '#525c6b',
-      labelColor: { color: '#c7ccd6' },
+      defaultEdgeColor: CANVAS[theme].edge,
+      labelColor: { color: theme === 'light' ? '#1b1f27' : '#c7ccd6' },
+      // sigma draws its own hover pill (white, centred) unless told not to: the tooltip below is
+      // the one this app owns, and two names for one node is one too many.
+      defaultDrawNodeHover: () => {},
       labelSize: 12,
       // 2D shows no standing labels: a field map's names are sentences, and a sentence over every
       // node is a wall of text that hides the shape it was drawn to show. A name appears when the
@@ -188,7 +216,7 @@ export default function SigmaView({
         if (!sel || node === sel) return data
         // Dimmed, not shrunk: relative size is the reading, and hiding it while something is
         // selected throws away the thing the map is for.
-        return { ...data, color: '#333842', label: '', size: Math.min(data.size, 24) }
+        return { ...data, color: CANVAS[theme].dim, label: '', size: Math.min(data.size, 24) }
       },
     })
 
@@ -263,7 +291,7 @@ export default function SigmaView({
         ctx.lineCap = 'round'
         ctx.strokeStyle = hovered
           ? '#9dc0ff'
-          : ((a as Record<string, unknown>).color as string) || 'rgba(96,106,124,0.75)'
+          : ((a as Record<string, unknown>).color as string) || CANVAS[theme].dash
         ctx.lineWidth = (edgePx(a as Record<string, unknown>, edgeScale) || 1) * (hovered ? 3 : 1)
         if (hovered) {
           ctx.shadowColor = 'rgba(120,170,255,0.9)'
@@ -344,12 +372,12 @@ export default function SigmaView({
           const top = Math.max(3, p.y - r - boxH - 5)
           ctx.beginPath()
           ctx.roundRect(left, top, boxW, boxH, 5)
-          ctx.fillStyle = 'rgba(16, 19, 25, 0.94)'
+          ctx.fillStyle = CANVAS[theme].tipBg
           ctx.fill()
-          ctx.strokeStyle = 'rgba(130, 150, 180, 0.35)'
+          ctx.strokeStyle = CANVAS[theme].tipLine
           ctx.lineWidth = 1
           ctx.stroke()
-          ctx.fillStyle = '#e3e9f4'
+          ctx.fillStyle = CANVAS[theme].tipFg
           ctx.fillText(label, left + padX, top + boxH / 2 + 0.5)
           ctx.restore()
         }
@@ -429,7 +457,7 @@ export default function SigmaView({
       drawRef.current = () => {}
       instance.kill()
     }
-  }, [graph, kg, arrows, edgeScale])
+  }, [graph, kg, arrows, edgeScale, theme])
 
   // selection only changes how nodes are drawn: refresh, never rebuild
   useEffect(() => {

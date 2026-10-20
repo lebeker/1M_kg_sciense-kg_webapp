@@ -4,7 +4,45 @@
   --muted: #8b93a1;
   --line: #2a2e36;
   --panel: #1b1e24;
+  /* Surfaces and text, named once so a second theme is a palette swap and not a second stylesheet. */
+  --surface-2: #1d2127;
+  --surface-3: #242833;
+  --hover: #2c3444;
+  --hover-line: #46536c;
+  --rule: #23272e;
+  --border-soft: #2b3038;
+  --text-2: #c7ccd6;
+  --text-3: #93a0b4;
+  --accent: #9dc0ff;
+  --accent-soft: #cfe0ff;
+  --danger: #b4544f;
+  --canvas: #14161a;
+  --node-dim: #333842;
   color-scheme: dark;
+}
+
+/* Daylight. Not an inversion: the canvas stays quieter than the page, and the accents keep their
+   meaning — a link is still a link, a warning is still warm. */
+:root[data-theme='light'] {
+  --bg: #f7f8fa;
+  --fg: #1b1f27;
+  --muted: #5c6675;
+  --line: #d7dce3;
+  --panel: #ffffff;
+  --surface-2: #f0f2f6;
+  --surface-3: #e8ebf1;
+  --hover: #dde5f5;
+  --hover-line: #a8b6cf;
+  --rule: #e6e9ef;
+  --border-soft: #d7dce3;
+  --text-2: #333a45;
+  --text-3: #5c6675;
+  --accent: #1f6feb;
+  --accent-soft: #0b4ea2;
+  --danger: #b42318;
+  --canvas: #f7f8fa;
+  --node-dim: #cdd3dc;
+  color-scheme: light;
 }
 
 * {
@@ -83,8 +121,8 @@ button {
 }
 
 .switch button.on {
-  background: #2c3444;
-  border-color: #46536c;
+  background: var(--hover);
+  border-color: var(--hover-line);
 }
 
 /* the renderers fill whatever is left; the panel and legend float above them */
@@ -132,7 +170,7 @@ button {
 }
 
 .hits li:hover {
-  background: #242833;
+  background: var(--surface-3);
 }
 
 .legend {
@@ -204,7 +242,7 @@ button {
 }
 
 .panel a {
-  color: #6ea8fe;
+  color: var(--accent);
   word-break: break-all;
 }
 
@@ -254,8 +292,8 @@ button {
 }
 
 .conn:hover {
-  background: #22262e;
-  border-color: #3c434f;
+  background: var(--surface-3);
+  border-color: var(--border-soft);
 }
 
 .conn .head {
@@ -335,10 +373,10 @@ button {
   justify-content: center;
   gap: 6px;
   background: rgba(20, 22, 26, 0.86);
-  color: #c7ccd6;
+  color: var(--text-2);
 }
 .measuring b { font-size: 13px; letter-spacing: 0.02em; }
-.measuring span { font-variant-numeric: tabular-nums; color: #8fa3c8; }
+.measuring span { font-variant-numeric: tabular-nums; color: var(--text-3); }
 .measuring i { font-style: normal; font-size: 11px; opacity: 0.6; }
 
 /* Over budget: said out loud, with the way past it. */
@@ -348,14 +386,14 @@ button {
   gap: 10px;
   padding: 6px 12px;
   margin: 0 12px 6px;
-  border: 1px solid #2b3038;
-  border-left: 3px solid #8fa3c8;
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--text-3);
   border-radius: 4px;
-  background: #191c21;
-  color: #c7ccd6;
+  background: var(--surface-2);
+  color: var(--text-2);
   font-size: 12px;
 }
-.banner span { color: #93a0b4; }
+.banner span { color: var(--text-3); }
 .banner button { margin-left: auto; }
 
 /* One relation word per block, foldable, with the nodes it reaches collapsible. */
@@ -365,9 +403,9 @@ button {
   align-items: center;
   gap: 8px;
   padding: 2px 0;
-  border-bottom: 1px solid #23272e;
+  border-bottom: 1px solid var(--rule);
   font-size: 12px;
-  color: #93a0b4;
+  color: var(--text-3);
 }
 .group-head i { font-style: normal; opacity: 0.7; }
 .group-head .tiny { margin-left: auto; }
@@ -376,33 +414,33 @@ button.link {
   border: 0;
   background: none;
   padding: 0;
-  color: #9dc0ff;
+  color: var(--accent);
   cursor: pointer;
   font: inherit;
   text-align: left;
 }
 button.tiny {
-  border: 1px solid #2b3038;
+  border: 1px solid var(--border-soft);
   border-radius: 3px;
-  background: #1d2127;
-  color: #93a0b4;
+  background: var(--surface-2);
+  color: var(--text-3);
   font-size: 11px;
   padding: 1px 6px;
   cursor: pointer;
 }
-button.tiny:hover, button.link:hover { color: #cfe0ff; }
+button.tiny:hover, button.link:hover { color: var(--accent-soft); }
 
-.collapsed { font-size: 12px; color: #93a0b4; }
+.collapsed { font-size: 12px; color: var(--text-3); }
 
 .doc-open {
   display: block;
   width: 100%;
   margin: 8px 0;
   padding: 5px;
-  border: 1px solid #2b3038;
+  border: 1px solid var(--border-soft);
   border-radius: 3px;
-  background: #1d2127;
-  color: #c7ccd6;
+  background: var(--surface-2);
+  color: var(--text-2);
   cursor: pointer;
 }
 
@@ -415,8 +453,8 @@ button.tiny:hover, button.link:hover { color: #cfe0ff; }
   width: min(760px, 62vw);
   display: flex;
   flex-direction: column;
-  border-left: 1px solid #2b3038;
-  background: #14161a;
+  border-left: 1px solid var(--border-soft);
+  background: var(--canvas);
   z-index: 6;
 }
 .doc header {
@@ -424,29 +462,29 @@ button.tiny:hover, button.link:hover { color: #cfe0ff; }
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border-bottom: 1px solid #23272e;
+  border-bottom: 1px solid var(--rule);
 }
-.doc header .path { font-size: 11px; color: #93a0b4; }
-.doc header button.on { border-color: #8fa3c8; color: #cfe0ff; }
+.doc header .path { font-size: 11px; color: var(--text-3); }
+.doc header button.on { border-color: var(--text-3); color: var(--accent-soft); }
 .doc-body {
   overflow: auto;
   padding: 12px 18px 40px;
-  color: #c7ccd6;
+  color: var(--text-2);
   font-size: 13px;
   line-height: 1.55;
 }
 .doc-body h1 { font-size: 19px; }
 .doc-body h2 { font-size: 16px; margin-top: 22px; }
 .doc-body h3 { font-size: 14px; margin-top: 18px; }
-.doc-body a { color: #9dc0ff; }
+.doc-body a { color: var(--accent); }
 .doc-body code {
-  background: #1d2127;
+  background: var(--surface-2);
   padding: 1px 4px;
   border-radius: 3px;
   font-size: 12px;
 }
 .doc-body pre {
-  background: #1d2127;
+  background: var(--surface-2);
   padding: 10px;
   border-radius: 4px;
   overflow: auto;
@@ -454,18 +492,18 @@ button.tiny:hover, button.link:hover { color: #cfe0ff; }
 .doc-body blockquote {
   margin: 10px 0;
   padding-left: 10px;
-  border-left: 2px solid #2b3038;
-  color: #93a0b4;
+  border-left: 2px solid var(--border-soft);
+  color: var(--text-3);
 }
 .doc-body ul { padding-left: 18px; }
 .doc-edit {
   flex: 1;
   margin: 10px;
   padding: 10px;
-  border: 1px solid #2b3038;
+  border: 1px solid var(--border-soft);
   border-radius: 4px;
-  background: #101216;
-  color: #c7ccd6;
+  background: var(--surface-2);
+  color: var(--text-2);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12.5px;
   line-height: 1.5;
@@ -476,10 +514,10 @@ button.tiny:hover, button.link:hover { color: #cfe0ff; }
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border-top: 1px solid #23272e;
+  border-top: 1px solid var(--rule);
 }
-.doc footer .note { margin-right: auto; font-size: 11px; color: #93a0b4; }
-.doc footer button.agent { border-color: #8fa3c8; color: #cfe0ff; }
+.doc footer .note { margin-right: auto; font-size: 11px; color: var(--text-3); }
+.doc footer button.agent { border-color: var(--text-3); color: var(--accent-soft); }
 
 /* A row inside a collapse: still the document's word, greyed so it reads as put away. */
 .conn.hidden-conn { opacity: 0.55; }
@@ -509,7 +547,7 @@ button.tiny:hover, button.link:hover { color: #cfe0ff; }
 }
 .legend .rel .eye { display: inline-flex; flex: none; color: var(--muted-foreground); }
 .legend .rel:hover .eye { color: var(--foreground); }
-.legend .rel.off .eye { color: #b4544f; }
+.legend .rel.off .eye { color: var(--danger); }
 .legend .rel { padding: 2px 3px; border-radius: 4px; }
 .legend .rel:hover { background: color-mix(in srgb, var(--foreground) 7%, transparent); }
 .legend .rel.off { color: var(--muted-foreground); }

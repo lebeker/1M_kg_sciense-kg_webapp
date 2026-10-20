@@ -45,6 +45,8 @@ type Props = {
   muted?: Set<string>
   /** Does a directed relation get a head by default? The graph decides. */
   arrows?: boolean
+  /** Day or night: the scene is a canvas, and it does not inherit a stylesheet. */
+  theme?: 'dark' | 'light'
   /** Multiplies every relation's width. The graph decides. */
   edgeScale?: number
 }
@@ -64,6 +66,7 @@ export default function ThreeView({
   muted,
   arrows = false,
   edgeScale = 1,
+  theme = 'dark',
 }: Props) {
   const host = useRef<HTMLDivElement | null>(null)
   const inst = useRef<Fg | null>(null)
@@ -143,10 +146,10 @@ export default function ThreeView({
 
         set(g, 'width', el.clientWidth)
         set(g, 'height', el.clientHeight)
-        set(g, 'backgroundColor', '#14161a')
+        set(g, 'backgroundColor', theme === 'light' ? '#f7f8fa' : '#14161a')
         set(g, 'nodeRelSize', 3)
         set(g, 'nodeLabel', (n: ForceNode) => n.label ?? n.id ?? '')
-        set(g, 'nodeColor', (n: ForceNode) => n.color ?? '#7b9ecb')
+        set(g, 'nodeColor', (n: ForceNode) => n.color ?? (theme === 'light' ? '#4a7bc4' : '#7b9ecb'))
         // 3D sizes follow the same claim 2D draws, not the raw number: `px` is the radius the
         // document resolved to, and volume grows as a compressed power of it, so a hub reads as
         // bigger without a small node vanishing next to it.
@@ -160,7 +163,9 @@ export default function ThreeView({
         // The same reading as 2D, from the same document: width from `power`, colour from the
         // edge, a head only where a direction was asked for.
         set(g, 'linkWidth', (l: Record<string, unknown>) => edgePx(l, edgeScale))
-        set(g, 'linkColor', (l: Record<string, unknown>) => (l.color as string) ?? '#525c6b')
+        set(g, 'linkColor', (l: Record<string, unknown>) =>
+          (l.color as string) ?? (theme === 'light' ? '#aab3c2' : '#525c6b'),
+        )
         set(g, 'linkDirectionalArrowLength', (l: Record<string, unknown>) =>
           edgeShape(l, arrows) === 'line' ? 0 : 3,
         )
@@ -215,7 +220,7 @@ export default function ThreeView({
       data.current = null
       clouds.current = []
     }
-  }, [kg, hidden, halos, halosOn, muted, arrows, edgeScale])
+  }, [kg, hidden, halos, halosOn, muted, arrows, edgeScale, theme])
 
   // Follow a connection in 3D: park the camera along the line from the origin to the node, the
   // standard way to look at one thing without losing where it is.

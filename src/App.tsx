@@ -285,6 +285,24 @@ export default function App() {
     !!kg &&
     ((docLimits.nodes ? kg.graph.order > docLimits.nodes : false) ||
       (docLimits.edges ? kg.graph.size > docLimits.edges : false))
+  /** Day or night. Kept on the device, because it is a preference about reading, not about the
+   * graph — two people opening the same file should each get their own. */
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try {
+      return localStorage.getItem('kg-theme') === 'light' ? 'light' : 'dark'
+    } catch {
+      return 'dark'
+    }
+  })
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    try {
+      localStorage.setItem('kg-theme', theme)
+    } catch {
+      /* private mode, or a browser that says no: the page still works, it just forgets */
+    }
+  }, [theme])
+
   /** Nothing is drawn yet: say so, rather than show an empty rectangle. */
   const [painted, setPainted] = useState(false)
   /** The reader decided to draw it all, knowing what it costs. */
@@ -728,6 +746,14 @@ export default function App() {
         {foldSteps.size > 0 || hiddenKinds.size > 0 || calHosts.size > 0 || foldAll ? (
           <button onClick={revealAll}>show all</button>
         ) : null}
+        <button
+          className="theme"
+          data-theme-toggle={theme}
+          title={theme === 'dark' ? 'switch to daylight' : 'switch to night'}
+          onClick={() => setTheme((v) => (v === 'dark' ? 'light' : 'dark'))}
+        >
+          {theme === 'dark' ? '☀' : '☾'}
+        </button>
         <button onClick={() => setFit((n) => n + 1)}>fit</button>
         <div className="switch">
           <button className={mode === '2d' ? 'on' : ''} onClick={() => setMode('2d')}>
@@ -817,6 +843,7 @@ export default function App() {
             calibrating={calibrating}
             onFirstFrame={() => setPainted(true)}
             onMeasured={setBudget}
+            theme={theme}
           />
         ) : (
           <Suspense fallback={<p className="empty">loading 3D…</p>}>
@@ -831,6 +858,7 @@ export default function App() {
               hidden={hidden}
               arrows={kg.meta?.visuals?.arrows ?? false}
               edgeScale={kg.meta?.visuals?.edge_width ?? 1}
+              theme={theme}
             />
           </Suspense>
         )}
