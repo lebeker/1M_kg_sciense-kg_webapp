@@ -42,6 +42,8 @@ type Props = {
   edgeScale?: number
   /** Measure this host before drawing: how many nodes it can hold at 30fps. */
   calibrating?: boolean
+  /** Called once, when there is a picture: before that, whatever the page shows is a promise. */
+  onFirstFrame?: () => void
   onMeasured?: (nodes: number) => void
 }
 
@@ -96,8 +98,12 @@ export default function SigmaView({
   edgeScale = 1,
   calibrating = false,
   onMeasured,
+  onFirstFrame,
 }: Props) {
   const host = useRef<HTMLDivElement | null>(null)
+  // The effect below must not re-run when a parent re-renders and hands over a new closure.
+  const onFirstFrameRef = useRef(onFirstFrame)
+  onFirstFrameRef.current = onFirstFrame
   const sigma = useRef<Sigma | null>(null)
   const selRef = useRef<string | null>(selected)
   const selectRef = useRef(onSelect)
@@ -318,6 +324,13 @@ export default function SigmaView({
 
     sizeCanvas()
     instance.on('afterRender', draw)
+    // The first frame is the end of the wait, not the start of one.
+    let said = false
+    instance.on('afterRender', () => {
+      if (said) return
+      said = true
+      onFirstFrameRef.current?.()
+    })
     const ro = new ResizeObserver(() => {
       sizeCanvas()
       instance.resize()

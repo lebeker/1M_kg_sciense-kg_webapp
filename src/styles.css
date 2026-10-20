@@ -543,3 +543,21 @@ button.tiny:hover, button.link:hover { color: #cfe0ff; }
 .bar .icon svg {
   display: block;
 }
+
+/* The first frame: a page that computes its own layout has a moment where it has nothing to
+   show, and an empty rectangle is indistinguishable from a broken one. */
+.loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  z-index: 6;
+  pointer-events: none;
+  color: var(--foreground, #e8edf5);
+  background: radial-gradient(ellipse at center, rgba(20, 24, 32, 0.35), rgba(12, 14, 19, 0.85));
+}
+.loading b { font-size: 14px; font-weight: 600; letter-spacing: 0.01em; }
+.loading span { font-size: 12px; color: #8d99ab; }

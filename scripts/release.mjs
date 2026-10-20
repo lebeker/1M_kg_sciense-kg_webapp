@@ -115,12 +115,15 @@ if (moved) {
   )
 }
 
-const push = (what) => {
-  const r = spawnSync('git', ['push', '-f', 'origin', what], { cwd: root, encoding: 'utf8' })
+// `dist` is a build branch: a normal push keeps its history, and only a tag that has to move
+// (a published tag is a promise — this is the one case it is re-pointed) is forced.
+const push = (what, force = false) => {
+  const args = force ? ['push', '--force', 'origin', what] : ['push', 'origin', what]
+  const r = spawnSync('git', args, { cwd: root, encoding: 'utf8' })
   if (r.status !== 0) fail(`push of ${what} failed:\n${r.stderr || r.stdout}`)
 }
 push('dist')
-push(tag)
+push(tag, Boolean(moved))
 const raw = `https://raw.githubusercontent.com/${slug}/${tag}/viewer.html`
 console.log(`\npublished:\n  ${raw}\n  https://raw.githubusercontent.com/${slug}/${tag}/app.json`)
 

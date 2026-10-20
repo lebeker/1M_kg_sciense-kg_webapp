@@ -257,6 +257,24 @@ export default function App() {
   /** What the numbers in `weight` measure, as the document itself states it. */
   const weightMetric = kg?.meta?.weight?.metric ?? 'connections'
 
+  /**
+   * The two numbers the document asks the page for. They are a request, not a stop: the document
+   * is written whole, and how much of it is drawn is this page's decision on this host.
+   */
+  const docLimits =
+    (kg?.meta as unknown as { limits?: { nodes?: number; edges?: number } } | undefined)?.limits ?? {}
+  const overDocLimits =
+    !!kg &&
+    ((docLimits.nodes ? kg.graph.order > docLimits.nodes : false) ||
+      (docLimits.edges ? kg.graph.size > docLimits.edges : false))
+  /** Nothing is drawn yet: say so, rather than show an empty rectangle. */
+  const [painted, setPainted] = useState(false)
+  /** The reader decided to draw it all, knowing what it costs. */
+  const [drawAllAnyway, setDrawAllAnyway] = useState(false)
+  const [confirmBig, setConfirmBig] = useState(false)
+  /** Opened grouped because the document is over its own limits — once, on load. */
+  const groupedOnLoad = useRef(false)
+
   /** This graph is bigger than what this host was measured to draw: draw a part of it. */
   const declared = kg?.meta?.visuals?.max_nodes ?? null
   const budgetNow = budget ?? declared
@@ -439,12 +457,30 @@ export default function App() {
   }, [])
 
   const revealAll = useCallback(() => {
+    // Drawing everything a document asks not to draw is a decision, so it is asked for twice:
+    // once to say what it will cost, once to agree to it.
+    if (overDocLimits && !drawAllAnyway) {
+      if (!confirmBig) {
+        setConfirmBig(true)
+        return
+      }
+      setDrawAllAnyway(true)
+    }
     setFoldSteps(new Map())
     setFoldAll(false)
     setHiddenKinds(new Set())
     setCalHidden(new Set())
     setCalHosts(new Map())
-  }, [])
+  }, [overDocLimits, drawAllAnyway, confirmBig])
+
+  // A document that asks for 500 nodes and arrives with 2,000 opens grouped: the top layer is the
+  // honest first picture of it. Asked once per load, so a reader who expands it is not folded
+  // back a second later by this effect.
+  useEffect(() => {
+    if (!kg || groupedOnLoad.current) return
+    groupedOnLoad.current = true
+    if (overDocLimits) setFoldAll(true)
+  }, [kg, overDocLimits])
 
   /** The edges a fold invents: rebuilt from scratch whenever a decision changes. */
   useEffect(() => {
@@ -685,6 +721,26 @@ export default function App() {
         </div>
       </header>
 
+      {kg && !painted ? (
+        <div className="loading" data-loading="first-frame">
+          <b>laying out {kg.graph.order} nodes</b>
+          <span>this page builds its own positions; nothing is being downloaded</span>
+        </div>
+      ) : null}
+
+      {overDocLimits && !drawAllAnyway && foldAll ? (
+        <div className="banner" data-limits="over">
+          <b>
+            {kg.graph.order} nodes · {docEdges} edges — this graph asks for{' '}
+            {docLimits.nodes ?? '—'} / {docLimits.edges ?? '—'}
+          </b>
+          <span>opened grouped, so it stays readable; the rest is one click away</span>
+          <button onClick={revealAll}>
+            {confirmBig ? `draw all ${docEdges} edges?` : 'draw everything'}
+          </button>
+        </div>
+      ) : null}
+
       {overBudget ? (
         <div className="banner">
           <b>
@@ -741,6 +797,7 @@ export default function App() {
             arrows={kg.meta?.visuals?.arrows ?? false}
             edgeScale={kg.meta?.visuals?.edge_width ?? 1}
             calibrating={calibrating}
+            onFirstFrame={() => setPainted(true)}
             onMeasured={setBudget}
           />
         ) : (
