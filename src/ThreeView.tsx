@@ -47,6 +47,8 @@ type Props = {
   arrows?: boolean
   /** Day or night: the scene is a canvas, and it does not inherit a stylesheet. */
   theme?: 'dark' | 'light'
+  /** In 3D a name is a tooltip either way; `off` is the only state that changes anything. */
+  labels?: 'on' | 'hover' | 'off'
   /** Multiplies every relation's width. The graph decides. */
   edgeScale?: number
 }
@@ -67,6 +69,7 @@ export default function ThreeView({
   arrows = false,
   edgeScale = 1,
   theme = 'dark',
+  labels = 'hover',
 }: Props) {
   const host = useRef<HTMLDivElement | null>(null)
   const inst = useRef<Fg | null>(null)
@@ -148,7 +151,9 @@ export default function ThreeView({
         set(g, 'height', el.clientHeight)
         set(g, 'backgroundColor', theme === 'light' ? '#f7f8fa' : '#14161a')
         set(g, 'nodeRelSize', 3)
-        set(g, 'nodeLabel', (n: ForceNode) => n.label ?? n.id ?? '')
+        set(g, 'nodeLabel', (n: ForceNode) =>
+          labels === 'off' ? '' : (n.label ?? n.id ?? ''),
+        )
         set(g, 'nodeColor', (n: ForceNode) => n.color ?? (theme === 'light' ? '#4a7bc4' : '#7b9ecb'))
         // 3D sizes follow the same claim 2D draws, not the raw number: `px` is the radius the
         // document resolved to, and volume grows as a compressed power of it, so a hub reads as
@@ -220,7 +225,7 @@ export default function ThreeView({
       data.current = null
       clouds.current = []
     }
-  }, [kg, hidden, halos, halosOn, muted, arrows, edgeScale, theme])
+  }, [kg, hidden, halos, halosOn, muted, arrows, edgeScale, theme, labels])
 
   // Follow a connection in 3D: park the camera along the line from the origin to the node, the
   // standard way to look at one thing without losing where it is.

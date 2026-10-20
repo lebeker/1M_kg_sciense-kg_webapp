@@ -599,3 +599,118 @@ button.tiny:hover, button.link:hover { color: var(--accent-soft); }
 }
 .loading b { font-size: 14px; font-weight: 600; letter-spacing: 0.01em; }
 .loading span { font-size: 12px; color: #8d99ab; }
+
+/* ---------------------------------------------------------------------------------------------
+   The legend, folded. Open, it is a control panel: every kind, every relation, and what a
+   relation looks like. Folded, it is one line — how much is in the map, and whether the names
+   are on it — because a reader who is looking at the map is not reading the legend.
+   ------------------------------------------------------------------------------------------- */
+.legend.collapsed {
+  padding: 5px 7px;
+}
+
+.legend-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.legend-head h4 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.legend-head .legend-labels {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.legend-head .fold,
+.legend-bar .expand {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.legend-head .fold:hover,
+.legend-bar .expand:hover {
+  color: var(--fg);
+}
+
+.legend-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.legend-bar b {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* Three positions, one control: on · hover · off. */
+.labels {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.labels button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  padding: 1px 5px;
+  cursor: pointer;
+}
+
+.labels button + button {
+  border-left: 1px solid var(--line);
+}
+
+.labels button:hover {
+  color: var(--fg);
+}
+
+.labels button.on {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--fg);
+}
+
+/* What the relation looks like where it is drawn: colour, dash, head, width. */
+.legend .rel .sample {
+  flex: none;
+  overflow: visible;
+}
+
+.panel h3 .link {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.panel h3 .link:hover {
+  color: var(--fg);
+}

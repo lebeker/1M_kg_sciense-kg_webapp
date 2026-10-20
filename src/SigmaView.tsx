@@ -46,6 +46,8 @@ type Props = {
   onFirstFrame?: () => void
   /** Day or night, because a canvas cannot read a stylesheet. */
   theme?: 'dark' | 'light'
+  /** Every name drawn, a name under the pointer, or none. */
+  labels?: 'on' | 'hover' | 'off'
   onMeasured?: (nodes: number) => void
 }
 
@@ -124,6 +126,7 @@ export default function SigmaView({
   onMeasured,
   onFirstFrame,
   theme = 'dark',
+  labels = 'hover',
 }: Props) {
   const host = useRef<HTMLDivElement | null>(null)
   // The effect below must not re-run when a parent re-renders and hands over a new closure.
@@ -182,12 +185,12 @@ export default function SigmaView({
       // sigma draws its own hover pill (white, centred) unless told not to: the tooltip below is
       // the one this app owns, and two names for one node is one too many.
       defaultDrawNodeHover: () => {},
+      // `Infinity` renders none — the hover pill below is then the only name on the map. With
+      // labels "on", sigma draws them all and the hover pill steps aside.
+      labelRenderedSizeThreshold: labels === 'on' ? 0 : Number.POSITIVE_INFINITY,
+      labelDensity: 1,
+      labelGridCellSize: 70,
       labelSize: 12,
-      // 2D shows no standing labels: a field map's names are sentences, and a sentence over every
-      // node is a wall of text that hides the shape it was drawn to show. A name appears when the
-      // reader points at a node — the same deal 3D makes.
-      labelRenderedSizeThreshold: Number.POSITIVE_INFINITY,
-      labelDensity: 0,
       minCameraRatio: 0.01,
       maxCameraRatio: 20,
       edgeReducer: (edge, data) => {
@@ -457,7 +460,7 @@ export default function SigmaView({
       drawRef.current = () => {}
       instance.kill()
     }
-  }, [graph, kg, arrows, edgeScale, theme])
+  }, [graph, kg, arrows, edgeScale, theme, labels])
 
   // selection only changes how nodes are drawn: refresh, never rebuild
   useEffect(() => {

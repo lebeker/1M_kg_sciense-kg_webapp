@@ -2,6 +2,9 @@ import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useS
 import {
   type Halo,
   type Kg,
+  edgeDash,
+  edgePx,
+  edgeShape,
   kindColor,
   kindsOf,
   loadDocs,
@@ -102,6 +105,37 @@ function renderValue(v: unknown) {
     )
   }
   return s
+}
+
+export type LabelMode = 'on' | 'hover' | 'off'
+
+/** Three positions, and no menu: a reader changes how much text is on the map in one click. */
+function LabelSwitch({ mode, onChange }: { mode: LabelMode; onChange: (m: LabelMode) => void }) {
+  return (
+    <span className="labels" role="group" aria-label="node labels">
+      {(['on', 'hover', 'off'] as const).map((m) => (
+        <button
+          key={m}
+          className={m === mode ? 'on' : ''}
+          data-labels-opt={m}
+          aria-pressed={m === mode}
+          title={
+            m === 'on'
+              ? 'every name on the map'
+              : m === 'hover'
+                ? 'a name only under the pointer'
+                : 'no names'
+          }
+          onClick={(e) => {
+            e.stopPropagation()
+            onChange(m)
+          }}
+        >
+          {m}
+        </button>
+      ))}
+    </span>
+  )
 }
 
 export default function App() {
@@ -305,6 +339,37 @@ export default function App() {
 
   /** Nothing is drawn yet: say so, rather than show an empty rectangle. */
   const [painted, setPainted] = useState(false)
+  const [legendOpen, setLegendOpen] = useState(true)
+  const [connOpen, setConnOpen] = useState(false)
+  /** Labels: on, under the pointer, or off. A small curated map wants names; a thousand-node
+   *  field map wants none until asked. The default reads the size of the document, and the
+   *  reader's choice is kept on the device afterwards. */
+  const [labelChoice, setLabelChoice] = useState<LabelMode | null>(() => {
+    try {
+      const saved = localStorage.getItem('kg-labels')
+      return saved === 'on' || saved === 'hover' || saved === 'off' ? saved : null
+    } catch {
+      return null
+    }
+  })
+  const declaredLabels = kg?.meta?.visuals?.labels
+  const labels: LabelMode =
+    labelChoice ??
+    (declaredLabels === 'on' || declaredLabels === 'hover' || declaredLabels === 'off'
+      ? (declaredLabels as LabelMode)
+      : (kg?.graph.order ?? 0) <= 50
+        ? 'on'
+        : 'hover')
+  const setLabels = useCallback((m: LabelMode) => {
+    setLabelChoice(m)
+    try {
+      localStorage.setItem('kg-labels', m)
+    } catch {
+      /* private mode: the page still works, it just forgets */
+    }
+  }, [])
+  const arrowsOn = kg?.meta?.visuals?.arrows ?? false
+  const edgeScale = kg?.meta?.visuals?.edge_width ?? 1
   /** The reader decided to draw it all, knowing what it costs. */
   const [drawAllAnyway, setDrawAllAnyway] = useState(false)
   const [confirmBig, setConfirmBig] = useState(false)
@@ -848,6 +913,7 @@ export default function App() {
             onFirstFrame={() => setPainted(true)}
             onMeasured={setBudget}
             theme={theme}
+            labels={labels}
           />
         ) : (
           <Suspense fallback={<p className="empty">loading 3D…</p>}>
@@ -863,6 +929,7 @@ export default function App() {
               arrows={kg.meta?.visuals?.arrows ?? false}
               edgeScale={kg.meta?.visuals?.edge_width ?? 1}
               theme={theme}
+              labels={labels}
             />
           </Suspense>
         )}
@@ -870,94 +937,157 @@ export default function App() {
 
       {(kinds.length > 0 || relations.length > 0) && (
         <div
-          className="legend"
+          className={legendOpen ? 'legend' : 'legend collapsed'}
           data-muted={[...muted].join(',')}
           data-kinds-off={[...hiddenKinds].join(',')}
+          data-labels={labels}
+          data-legend={legendOpen ? 'open' : 'collapsed'}
         >
-          {/* The eye is the control. A row that is off keeps its word and its count — the map is
-              smaller, the document is not — and the icon is what says so. */}
-          {kinds.length > 0 && (
+          {/* Folded away, the legend is one line that still answers the questions a reader asks
+              before touching anything: how much is in the map, and are the names on it. */}
+          {!legendOpen ? (
+            <div className="legend-bar">
+              <button
+                className="expand"
+                data-legend-toggle="open"
+                title="open the legend"
+                onClick={() => setLegendOpen(true)}
+              >
+                ▸
+              </button>
+              <span className="counts">
+                NODES <b>{kg.graph.order}</b> · EDGES <b>{kg.graph.size}</b>
+              </span>
+              <LabelSwitch mode={labels} onChange={setLabels} />
+            </div>
+          ) : (
             <>
-              <h4>
-                nodes
+              <div className="legend-head">
+                <h4>legend</h4>
+                <span className="legend-labels">
+                  labels <LabelSwitch mode={labels} onChange={setLabels} />
+                </span>
                 <button
-                  className="link"
-                  data-fold-all={foldAll ? 'on' : 'off'}
-                  title="put away everything that is not a category — people, papers, labs — and keep what each category absorbed"
-                  onClick={() => setFoldAll((v) => !v)}
+                  className="link fold"
+                  data-legend-toggle="close"
+                  title="fold the legend away"
+                  onClick={() => setLegendOpen(false)}
                 >
-                  {foldAll ? 'unfold' : 'only categories'}
+                  ▴
                 </button>
-              </h4>
-              <ul className="rels">
-                {kinds.slice(0, 12).map((k) => {
-                  const off = hiddenKinds.has(k.kind)
-                  return (
-                    <li key={k.kind}>
-                      <button
-                        className={off ? 'rel off' : 'rel'}
-                        title={
-                          off
-                            ? `fold every ${k.kind} away — their mass goes to what holds them`
-                            : `fold the ${k.kind} kind away, keeping what it connects`
-                        }
-                        onClick={() =>
-                          setHiddenKinds((prev) => {
-                            const next = new Set(prev)
-                            if (next.has(k.kind)) next.delete(k.kind)
-                            else next.add(k.kind)
-                            return next
-                          })
-                        }
-                      >
-                        <span className="dot" style={{ background: k.color }} />
-                        <span className="word">{k.kind}</span>
-                        <span className="eye" aria-hidden="true">
-                          {off ? eyeOff : eyeOn}
-                        </span>
-                        <i>{k.count}</i>
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            </>
-          )}
-          {relations.length > 0 && (
-            <>
-              <h4>relations</h4>
-              <ul className="rels">
-                {relations.map((r) => {
-                  const off = muted.has(r.rel)
-                  return (
-                    <li key={r.rel}>
-                      <button
-                        className={off ? 'rel off' : 'rel'}
-                        title={
-                          off
-                            ? 'off everywhere: not drawn, not listed in the panel, and not folded'
-                            : 'drawn — switch a relation off when it says more about the corpus than about the field'
-                        }
-                        onClick={() =>
-                          setMuted((prev) => {
-                            const next = new Set(prev)
-                            if (next.has(r.rel)) next.delete(r.rel)
-                            else next.add(r.rel)
-                            return next
-                          })
-                        }
-                      >
-                        <span className="mark" />
-                        <span className="word">{r.rel}</span>
-                        <span className="eye" aria-hidden="true">
-                          {off ? eyeOff : eyeOn}
-                        </span>
-                        <i>{r.n}</i>
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
+              </div>
+              {/* The eye is the control. A row that is off keeps its word and its count — the map is
+                  smaller, the document is not — and the icon is what says so. */}
+              {kinds.length > 0 && (
+                <>
+                  <h4>
+                    nodes
+                    <button
+                      className="link"
+                      data-fold-all={foldAll ? 'on' : 'off'}
+                      title="put away everything that is not a category — people, papers, labs — and keep what each category absorbed"
+                      onClick={() => setFoldAll((v) => !v)}
+                    >
+                      {foldAll ? 'unfold' : 'only categories'}
+                    </button>
+                  </h4>
+                  <ul className="rels">
+                    {kinds.slice(0, 12).map((k) => {
+                      const off = hiddenKinds.has(k.kind)
+                      return (
+                        <li key={k.kind}>
+                          <button
+                            className={off ? 'rel off' : 'rel'}
+                            title={
+                              off
+                                ? `fold every ${k.kind} away — their mass goes to what holds them`
+                                : `fold the ${k.kind} kind away, keeping what it connects`
+                            }
+                            onClick={() =>
+                              setHiddenKinds((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(k.kind)) next.delete(k.kind)
+                                else next.add(k.kind)
+                                return next
+                              })
+                            }
+                          >
+                            <span className="dot" style={{ background: k.color }} />
+                            <span className="word">{k.kind}</span>
+                            <span className="eye" aria-hidden="true">
+                              {off ? eyeOff : eyeOn}
+                            </span>
+                            <i>{k.count}</i>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </>
+              )}
+              {relations.length > 0 && (
+                <>
+                  <h4>relations</h4>
+                  <ul className="rels">
+                    {relations.map((r) => {
+                      const off = muted.has(r.rel)
+                      // The sample is one real edge of this relation: the same colour, the same
+                      // dash, the same head, the same width the map draws. A legend that only
+                      // names a relation makes the reader go and find one to see what it looks
+                      // like; this one shows it.
+                      const shape = edgeShape(r.sample, arrowsOn)
+                      const dash = edgeDash(r.sample)
+                      const stroke =
+                        typeof r.sample.color === 'string' ? r.sample.color : 'var(--text-3)'
+                      const px = Math.min(2.4, Math.max(1, edgePx(r.sample, edgeScale)))
+                      return (
+                        <li key={r.rel}>
+                          <button
+                            className={off ? 'rel off' : 'rel'}
+                            title={
+                              off
+                                ? 'off everywhere: not drawn, not listed in the panel, and not folded'
+                                : 'drawn — switch a relation off when it says more about the corpus than about the field'
+                            }
+                            onClick={() =>
+                              setMuted((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(r.rel)) next.delete(r.rel)
+                                else next.add(r.rel)
+                                return next
+                              })
+                            }
+                          >
+                            <svg className="sample" width="34" height="10" viewBox="0 0 34 10" aria-hidden="true">
+                              <line
+                                x1={shape === 'double' ? 5 : 1}
+                                y1="5"
+                                x2={shape === 'line' ? 33 : 26}
+                                y2="5"
+                                stroke={stroke}
+                                strokeWidth={px}
+                                strokeDasharray={dash ? dash.join(' ') : undefined}
+                                strokeLinecap="round"
+                              />
+                              {shape === 'arrow' || shape === 'double' ? (
+                                <path d="M26 1.5 L33 5 L26 8.5" fill="none" stroke={stroke} strokeWidth="1.2" />
+                              ) : null}
+                              {shape === 'double' ? (
+                                <path d="M8 1.5 L1 5 L8 8.5" fill="none" stroke={stroke} strokeWidth="1.2" />
+                              ) : null}
+                            </svg>
+                            <span className="word">{r.rel}</span>
+                            <span className="eye" aria-hidden="true">
+                              {off ? eyeOff : eyeOn}
+                            </span>
+                            <i>{r.n}</i>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </>
+              )}
             </>
           )}
         </div>
@@ -1087,10 +1217,18 @@ export default function App() {
               the graph, not a dead end. */}
           {groups.length > 0 ? (
             <>
+              {/* Folded by default: the panel opens to answer "what is this node", and the list of
+                  everything it touches is the second question, not the first. */}
               <h3>
-                connections <i>{connections.length}</i>
+                <button
+                  className="link"
+                  data-conn-toggle={connOpen ? 'open' : 'closed'}
+                  onClick={() => setConnOpen((v) => !v)}
+                >
+                  {connOpen ? '▾' : '▸'} connections <i>{connections.length}</i>
+                </button>
               </h3>
-              {groups.map((g) => (
+              {(connOpen ? groups : []).map((g) => (
                 <div className="group" key={g.rel}>
                   <div className="group-head">
                     <button

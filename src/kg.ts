@@ -19,6 +19,8 @@ export type KgMeta = {
   weight?: KgWeight
   /** Per-graph visual decisions, so taste is data and not a hardcode. See KgVisuals. */
   visuals?: KgVisuals
+  /** `force` says the coordinates in the file are scratch: lay the graph out from its edges. */
+  layout?: string
 }
 
 /**
@@ -46,6 +48,11 @@ export type KgVisuals = {
   attributes?: string[]
   /** Relation words the reader starts with switched off (`visuals --mute`). */
   mute?: string[]
+  /**
+   * How much of the map is named at rest: `on` for a curated article-sized picture, `hover` for a
+   * field map whose names are sentences, `off` for a shape with no words. The reader's switch wins.
+   */
+  labels?: 'on' | 'hover' | 'off'
 }
 
 /**
@@ -142,10 +149,17 @@ const DEFAULT_KIND_MULTIPLIERS: Record<string, number> = {
   lab: 3, institution: 3, company: 3,
   subject: 10, concept: 10,
 }
-/** px = SCALE * sqrt(score): a hundredfold score is a tenfold circle, not a hundredfold one. */
-const WEIGHT_SCALE = 2.5
-const WEIGHT_MIN_PX = 1.5
-const WEIGHT_MAX_PX = 28
+/**
+ * px = FLOOR + SCALE * sqrt(score): a hundredfold score is a tenfold circle, not a hundredfold one.
+ *
+ * The floor is the point. `2.5 * sqrt(score)` sent every weakly-connected node — a paper with two
+ * citations, an institution on the edge of a field — to 0.8 px, which is a dot nobody can point
+ * at, let alone hover. Growing from a floor keeps the ordering while making the smallest node in
+ * the map a thing a person can hit: 4 px is the smallest radius that still reads as a circle.
+ */
+const WEIGHT_SCALE = 2.2
+const WEIGHT_MIN_PX = 4
+const WEIGHT_MAX_PX = 26
 
 /** An edge's power: 1 is normal. This is how wide, and how faint, that makes it. */
 export const POWER_DEFAULT = 1
@@ -166,9 +180,9 @@ export function powerOf(attrs: Record<string, unknown>): number {
 
 /** The score in `weight` is abstract; sigma wants pixels. */
 const pxFromWeight = (score: number) =>
-  clamp(WEIGHT_MIN_PX, WEIGHT_MAX_PX, WEIGHT_SCALE * Math.sqrt(Math.max(0, score)))
-/** A `size` written by hand is a weight too; this is the older, direct mapping. */
-const pxFromSize = (s: number) => Math.min(30, 3 + s * 1.6)
+  clamp(WEIGHT_MIN_PX, WEIGHT_MAX_PX, WEIGHT_MIN_PX + WEIGHT_SCALE * Math.sqrt(Math.max(0, score)))
+/** A `size` written by hand is a weight too; this is the older, direct mapping, floored alike. */
+const pxFromSize = (s: number) => Math.max(WEIGHT_MIN_PX, Math.min(30, 3 + s * 1.6))
 
 const num = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) ? v : undefined
@@ -193,15 +207,26 @@ const placed = (a: Record<string, unknown>): boolean =>
  * Positions are optional in the document and mandatory for sigma: a node without a numeric
  * x/y makes it throw inside the constructor, which leaves a blank page rather than a graph.
  *
- * Three cases, in the order the document gets to decide:
- *   - every node has x,y  -> the author's placement, used as given
- *   - any node has `ring` -> the rings are built (0 at the centre, higher numbers further out)
- *   - neither             -> a force layout, so a graph nobody placed is still readable
+ * Four cases, in the order the document gets to decide — `meta.layout` names one outright, so a
+ * graph can say "don't trust these coordinates, lay it out" without dropping them from the file:
+ *   - `meta.layout: "force"`  -> a force layout, whatever x/y the document carries
+ *   - every node has x,y      -> the author's placement, used as given
+ *   - any node has `ring`     -> the rings are built (0 at the centre, higher numbers further out)
+ *   - neither                 -> a force layout, so a graph nobody placed is still readable
+ *
+ * The last case is the default for a document that has no geometry at all, which is the honest
+ * reading of a file the skill wrote: `x`/`y` are a *viewer* concern, and an author who wants a
+ * particular picture should say so once, not move thirty-five dots by hand.
  */
 export function ensurePositions(kg: Kg): 'authored' | 'rings' | 'computed' {
   const g = kg.graph
   const n = g.order
   if (n === 0) return 'authored'
+  const wanted = str(kg.meta?.layout)
+  if (wanted === 'force') {
+    layoutForce(g, true)
+    return 'computed'
+  }
   let given = 0
   let ringed = 0
   g.forEachNode((_id, a) => {
@@ -215,6 +240,13 @@ export function ensurePositions(kg: Kg): 'authored' | 'rings' | 'computed' {
     return 'rings'
   }
 
+  layoutForce(g, false)
+  return 'computed'
+}
+
+/** The force pass, with the deterministic start that makes the same document look the same twice. */
+function layoutForce(g: Graph, ignoreGiven: boolean): void {
+  const n = g.order
   // Deterministic start: nodes on a phyllotaxis spiral in document order. `random.assign` and
   // `Math.random` made the same document come out as a different picture on every reload — a map
   // that moves when nothing changed reads as a bug — and a hash-scattered start bunched nodes up
@@ -222,10 +254,10 @@ export function ensurePositions(kg: Kg): 'authored' | 'rings' | 'computed' {
   // spaced, which is the only reason it is here.
   let i = 0
   const golden = Math.PI * (3 - Math.sqrt(5))
-  const n0 = g.order || 1
+  const n0 = n || 1
   g.forEachNode((id: string, a: Record<string, unknown>) => {
     i += 1
-    if (placed(a)) return
+    if (!ignoreGiven && placed(a)) return
     const r = 40 * Math.sqrt(i / n0)
     const t = i * golden
     g.mergeNodeAttributes(id, { x: r * Math.cos(t), y: r * Math.sin(t) })
@@ -236,7 +268,6 @@ export function ensurePositions(kg: Kg): 'authored' | 'rings' | 'computed' {
     // Barnes-Hut is the difference between "instant" and "hang" past a few hundred nodes.
     settings: { barnesHutOptimize: n > 500, scalingRatio: 10, gravity: 1, adjustSizes: true },
   })
-  return 'computed'
 }
 
 /**
@@ -529,14 +560,23 @@ export function relationOf(a: Record<string, unknown>): string {
 }
 
 /** Every relation word in the document with how many relations carry it, commonest first. */
-export function relationsOf(kg: Kg): { rel: string; n: number }[] {
+export type RelCount = {
+  rel: string
+  n: number
+  /** One real edge of this relation, so the legend can draw what the map draws. */
+  sample: Record<string, unknown>
+}
+
+export function relationsOf(kg: Kg): RelCount[] {
   const count = new Map<string, number>()
+  const sample = new Map<string, Record<string, unknown>>()
   kg.graph.forEachEdge((_key, a) => {
     const rel = relationOf(a as Record<string, unknown>)
     count.set(rel, (count.get(rel) ?? 0) + 1)
+    if (!sample.has(rel)) sample.set(rel, a as Record<string, unknown>)
   })
   return [...count.entries()]
-    .map(([rel, n]) => ({ rel, n }))
+    .map(([rel, n]) => ({ rel, n, sample: sample.get(rel) ?? {} }))
     .sort((x, y) => y.n - x.n || x.rel.localeCompare(y.rel))
 }
 
