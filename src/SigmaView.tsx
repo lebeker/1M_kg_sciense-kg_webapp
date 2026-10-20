@@ -106,6 +106,8 @@ export default function SigmaView({
   onFirstFrameRef.current = onFirstFrame
   const sigma = useRef<Sigma | null>(null)
   const selRef = useRef<string | null>(selected)
+  /** The node under the pointer: its name is the only label 2D draws, and only then. */
+  const hoverNodeRef = useRef<string | null>(null)
   const selectRef = useRef(onSelect)
   const hoverRef = useRef<string | null>(null)
   const mutedRef = useRef<Set<string>>(new Set())
@@ -146,7 +148,6 @@ export default function SigmaView({
     // threshold is a property of the graph, not a taste, so it is derived from it: up to
     // about a hundred nodes every label fits and every label is the point; past that,
     // weight decides which ones earn the space.
-    const small = graph.order <= 100
     const instance = new Sigma(graph, el, {
       renderEdgeLabels: false,
       // #2b3038 on a #14161a page is 1.1:1 — the relations were there but unreadable. A
@@ -154,8 +155,11 @@ export default function SigmaView({
       defaultEdgeColor: '#525c6b',
       labelColor: { color: '#c7ccd6' },
       labelSize: 12,
-      labelRenderedSizeThreshold: small ? 0 : 7,
-      labelDensity: small ? 1 : 0.5,
+      // 2D shows no standing labels: a field map's names are sentences, and a sentence over every
+      // node is a wall of text that hides the shape it was drawn to show. A name appears when the
+      // reader points at a node — the same deal 3D makes.
+      labelRenderedSizeThreshold: Number.POSITIVE_INFINITY,
+      labelDensity: 0,
       minCameraRatio: 0.01,
       maxCameraRatio: 20,
       edgeReducer: (edge, data) => {
@@ -319,11 +323,84 @@ export default function SigmaView({
           })
         })
       }
+
+      // The name of whatever the reader is pointing at. Drawn here, not by sigma, because a
+      // label that follows the cursor has to escape the label-density rule that governs the map.
+      const pointed = hoverNodeRef.current
+      if (pointed && visible(pointed)) {
+        const label = String(kg.graph.getNodeAttributes(pointed).label ?? pointed)
+        if (label) {
+          const p = point(pointed)
+          const r = radius(pointed)
+          ctx.save()
+          ctx.font = '12px ui-sans-serif, system-ui, -apple-system, sans-serif'
+          ctx.textBaseline = 'middle'
+          const padX = 7
+          const padY = 5
+          const w = Math.ceil(ctx.measureText(label).width)
+          const boxW = w + padX * 2
+          const boxH = 12 + padY * 2
+          const left = Math.min(Math.max(3, p.x - boxW / 2), canvas.width / dpr - boxW - 3)
+          const top = Math.max(3, p.y - r - boxH - 5)
+          ctx.beginPath()
+          ctx.roundRect(left, top, boxW, boxH, 5)
+          ctx.fillStyle = 'rgba(16, 19, 25, 0.94)'
+          ctx.fill()
+          ctx.strokeStyle = 'rgba(130, 150, 180, 0.35)'
+          ctx.lineWidth = 1
+          ctx.stroke()
+          ctx.fillStyle = '#e3e9f4'
+          ctx.fillText(label, left + padX, top + boxH / 2 + 0.5)
+          ctx.restore()
+        }
+      }
     }
     drawRef.current = draw
 
     sizeCanvas()
     instance.on('afterRender', draw)
+    // Hover is measured here rather than taken from sigma's own `enterNode`: that event is
+    // computed from the picking buffer and only fires for a trusted mouse on sigma's own layer,
+    // which makes "does the tooltip work" untestable and leaves a second source of truth.
+    let hoverFrame = 0
+    const onMove = (event: MouseEvent) => {
+      if (hoverFrame) return
+      hoverFrame = requestAnimationFrame(() => {
+        hoverFrame = 0
+        const rect = el.getBoundingClientRect()
+        const vx = event.clientX - rect.left
+        const vy = event.clientY - rect.top
+        const ratio = instance.getCamera().getState().ratio || 1
+        let best: string | null = null
+        let bestDist = Infinity
+        kg.graph.forEachNode((id, a) => {
+          if (hiddenRef.current.has(id) || calRef.current.has(id)) return
+          if (typeof a.x !== 'number' || typeof a.y !== 'number') return
+          const p = instance.graphToViewport({ x: a.x, y: a.y })
+          const shown = instance.getNodeDisplayData(id) as { size?: number } | undefined
+          const r = (shown?.size ?? 4) / (2 * ratio)
+          const d = Math.hypot(p.x - vx, p.y - vy)
+          // A little tolerance: pointing at a two-pixel dot is not a precision task.
+          if (d <= Math.max(7, r + 2) && d < bestDist) {
+            bestDist = d
+            best = id
+          }
+        })
+        // On the element, so a test can see what the pointer found without reading pixels.
+        el.setAttribute('data-hover', best ?? '')
+        if (best !== hoverNodeRef.current) {
+          hoverNodeRef.current = best
+          drawRef.current?.()
+        }
+      })
+    }
+    const onLeave = () => {
+      if (!hoverNodeRef.current) return
+      hoverNodeRef.current = null
+      drawRef.current?.()
+    }
+    el.addEventListener('mousemove', onMove)
+    el.addEventListener('mouseleave', onLeave)
     // The first frame is the end of the wait, not the start of one.
     let said = false
     instance.on('afterRender', () => {
@@ -339,8 +416,14 @@ export default function SigmaView({
     ro.observe(el)
 
     sigma.current = instance
+    // A handle for tests and for anyone reading the page in a console: the instance is otherwise
+    // private, and "is the tooltip where it should be" is not a question the DOM can answer.
+    ;(el as unknown as { __sigma__?: Sigma }).__sigma__ = instance
     return () => {
       ro.disconnect()
+      el.removeEventListener('mousemove', onMove)
+      el.removeEventListener('mouseleave', onLeave)
+      if (hoverFrame) cancelAnimationFrame(hoverFrame)
       canvas.remove()
       sigma.current = null
       drawRef.current = () => {}
@@ -490,6 +573,8 @@ export default function SigmaView({
       // how many rings are on screen, not how many nodes wear them — and none when they are off
       data-rings={halosOn === false ? 0 : [...(halos?.values() ?? [])].reduce((n, k) => n + k.length, 0)}
       data-halos={halosOn === false ? 'off' : 'on'}
+      // Names are drawn on hover, not standing: a field map's labels are sentences.
+      data-labels="tooltip"
       style={insetRight ? { width: `calc(100% - ${insetRight}px)` } : undefined}
     >
       {progress ? (
