@@ -63,10 +63,10 @@ const CALIBRATE_OVER = 600
 
 /** The rows the panel lays out in its own order. Everything else a node carries is data. */
 const LAID_OUT = new Set([
-  'id', 'label', 'kind', 'level', 'size', 'parent', 'tags', 'link', 'desc', 'color',
-  'style', 'x', 'y', 'doc', 'md', 'desc_rev',
+  'id', 'label', 'kind', 'level', 'size', 'tags', 'link', 'desc', 'color',
+  'style', 'x', 'y', 'doc', 'md', 'desc_rev', 'px',
   // Shown in their own row: `cited 300 · 6 here · openalex`.
-  'cited_by', 'cited_by_source', 'cited_by_at',
+  'cited_by', 'cited_by_source', 'cited_by_at', 'references', 'references_source',
   // Resolved by the data layer from the edges around the node, and shown in their own rows:
   // `weight` is what the node is worth, `px` is how big that turned out on screen.
   'weight', 'weight_from', 'px',
@@ -258,13 +258,18 @@ export default function App() {
 
   /** How many citation edges this node already has on the map — computed, never stored: a
    * document that has to say "6 of 300" twice will eventually disagree with itself. */
-  const citedHere = useMemo(() => {
-    if (!kg || !selected) return 0
-    let n = 0
-    kg.graph.forEachEdge(selected, (_e, a) => {
-      if (String(a.label ?? '') === 'cites') n += 1
+  const citesHere = useMemo(() => {
+    const at = { in: 0, out: 0 }
+    if (!kg || !selected) return at
+    kg.graph.forEachEdge(selected, (_edge, a, source) => {
+      if (String(a.label ?? '') !== 'cites') return
+      // The authored direction: a `dir: in` relation is stored pointing the other way, so the
+      // storage source is the cited work, not the citing one.
+      const authored = a.authored_from !== undefined ? String(a.authored_from) : String(source)
+      if (authored === selected) at.out += 1
+      else at.in += 1
     })
-    return n
+    return at
   }, [kg, selected])
 
   /** What the numbers in `weight` measure, as the document itself states it. */
@@ -949,13 +954,27 @@ export default function App() {
             {/* `size`, `level` and `parent` are the engine talking to itself: a hand-set weight,
                 a fold depth, a hierarchy slot nothing writes. They stay in the document and stay
                 out of the panel — a reader asking "what is this" is not asking for a fold depth. */}
+            {nodeAttrs.references != null ? (
+              <>
+                <dt>cites</dt>
+                <dd>
+                  {String(nodeAttrs.references)}{' '}
+                  <span className="from">
+                    {citesHere.out} here
+                    {nodeAttrs.references_source
+                      ? ` · ${String(nodeAttrs.references_source)}`
+                      : ''}
+                  </span>
+                </dd>
+              </>
+            ) : null}
             {nodeAttrs.cited_by != null ? (
               <>
                 <dt>cited</dt>
                 <dd>
                   {String(nodeAttrs.cited_by)}{' '}
                   <span className="from">
-                    {citedHere} here
+                    {citesHere.in} here
                     {nodeAttrs.cited_by_source ? ` · ${String(nodeAttrs.cited_by_source)}` : ''}
                   </span>
                 </dd>

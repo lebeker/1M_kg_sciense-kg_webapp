@@ -69,7 +69,12 @@ once, with its source and date:
 
 ```
 kg.py add-node … --set cited_by=300 --set cited_by_source=openalex --set cited_by_at=2026-10-20
+kg.py set-node  … --set references=41 --set references_source=openalex
 ```
+
+Both directions are counts, and both are free with the record: `cited_by` is "who cites me"
+(`cited_by_count`), `references` is "what I cite" (`referenced_works_count`). Neither is a list,
+and neither is the number of edges on the map — the viewer counts those itself.
 
 Never pay a search for a number a record already carries. OpenCitations gives you the citing list
 for free, and each link says whether it is an author self-citation (`author_sc`), which is the only

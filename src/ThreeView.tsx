@@ -147,7 +147,16 @@ export default function ThreeView({
         set(g, 'nodeRelSize', 3)
         set(g, 'nodeLabel', (n: ForceNode) => n.label ?? n.id ?? '')
         set(g, 'nodeColor', (n: ForceNode) => n.color ?? '#7b9ecb')
-        set(g, 'nodeVal', (n: ForceNode) => n.size ?? 2)
+        // 3D sizes follow the same claim 2D draws, not the raw number: `px` is the radius the
+        // document resolved to, and volume grows as a compressed power of it, so a hub reads as
+        // bigger without a small node vanishing next to it.
+        set(g, 'nodeVal', (n: ForceNode) => {
+          // `size` arrives already resolved to a radius in pixels (from `weight`, or from the
+          // document's own `size`). Volume grows as a compressed power of it, so the ordering is
+          // the same as 2D and the extremes do not collapse into one blob.
+          const v = Math.pow(Math.max(1, Number(n.size) || 4) / 3, 2.2)
+          return Math.min(30, Math.max(0.5, v))
+        })
         // The same reading as 2D, from the same document: width from `power`, colour from the
         // edge, a head only where a direction was asked for.
         set(g, 'linkWidth', (l: Record<string, unknown>) => edgePx(l, edgeScale))
