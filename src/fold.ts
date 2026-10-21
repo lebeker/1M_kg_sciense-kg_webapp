@@ -48,6 +48,11 @@ type Rel = { power: number; label: string }
  * A document that never wrote `level` still has a shape: a paper sits under its subject, a person
  * under their paper, a lab under their person. Without this fallback a graph imported from a
  * provider — no levels anywhere — had a fold button that did nothing at all, on every node.
+ *
+ * The anchors are **whole numbers**: the axis is one coordinate, and `2.5` only ever meant
+ * "between a subject and a paper". A node may stand anywhere between two anchors — a sub-concept
+ * at 2.2, a satellite paper at 3.4 — and that is the authored case, not this table's business.
+ * An app may declare its own anchors in `meta.levels`; a document that does wins over this.
  */
 const DEFAULT_LEVEL: Record<string, number> = {
   subject: 2,
@@ -55,30 +60,35 @@ const DEFAULT_LEVEL: Record<string, number> = {
   field: 2,
   concept: 2,
   idea: 2,
-  paper: 2.5,
-  publication: 2.5,
-  article: 2.5,
-  work: 2.5,
-  preprint: 2.5,
-  study: 2.5,
-  scientist: 3,
-  researcher: 3,
-  author: 3,
-  person: 3,
-  people: 3,
-  lab: 3.5,
-  laboratory: 3.5,
-  institution: 4,
-  university: 4,
-  company: 4,
-  funder: 4,
+  paper: 3,
+  publication: 3,
+  article: 3,
+  work: 3,
+  preprint: 3,
+  study: 3,
+  scientist: 4,
+  researcher: 4,
+  author: 4,
+  person: 4,
+  people: 4,
+  lab: 5,
+  laboratory: 5,
+  institution: 6,
+  university: 6,
+  company: 6,
+  funder: 6,
 }
+
+const FALLBACK_LEVEL = 3
 
 const levelOf = (kg: Kg, id: string): number => {
   const a = kg.graph.hasNode(id) ? (kg.graph.getNodeAttribute(id, 'level') as unknown) : undefined
   if (typeof a === 'number') return a
   const kind = String(kg.graph.getNodeAttribute(id, 'kind') ?? '').toLowerCase()
-  return DEFAULT_LEVEL[kind] ?? 2.5
+  const anchors = kg.meta?.levels
+  const declared = anchors ? anchors[kind] : undefined
+  if (typeof declared === 'number') return declared
+  return DEFAULT_LEVEL[kind] ?? FALLBACK_LEVEL
 }
 
 const kindOf = (kg: Kg, id: string): string =>

@@ -89,7 +89,7 @@ if (existsSync(appsPath)) {
   let touched = 0
   for (const app of Object.values(apps.apps ?? {})) {
     if (app?.id !== decl.id) continue
-    for (const k of ['requires', 'recommends', 'tool_notes']) {
+    for (const k of ['requires', 'recommends', 'tool_notes', 'levels', 'level_note']) {
       if (decl[k] !== undefined) app[k] = decl[k]
     }
     app.skills_url = `${repo}/main/skills`

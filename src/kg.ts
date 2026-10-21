@@ -15,6 +15,13 @@ export type KgMeta = {
   app_url?: string
   /** What the graph needs beyond the document itself. */
   requires?: { skills?: string[]; plugins?: string[]; tools?: string[] }
+  /**
+   * Where a kind sits on the level axis when a node of that kind carries no `level` of its
+   * own: whole numbers, because the axis is one coordinate and `2.5` only ever meant "between
+   * a subject and a paper". A node may stand anywhere on the axis (a sub-concept at 2.2, a
+   * satellite paper at 3.4) — these are the anchors, not the law.
+   */
+  levels?: Record<string, number>
   /** How importance was measured for this graph. See KgWeight. */
   weight?: KgWeight
   /** Per-graph visual decisions, so taste is data and not a hardcode. See KgVisuals. */

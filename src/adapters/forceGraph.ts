@@ -44,8 +44,10 @@ export type ForceGraphData = { nodes: ForceNode[]; links: ForceLink[] }
  * `source`/`target` strings for node references and writes x/y/z back onto the
  * nodes, so handing it the live graph would corrupt the shared data layer.
  *
- * `z` carries hierarchy when the document has `level` (top level nearest the
- * camera); otherwise it is 0 and the force layout arranges depth itself.
+ * `z` carries hierarchy when the document has `level` (top level nearest the camera).
+ * A graph with no levels at all still has a vertical reading: `weight` — how much a thing
+ * counts on this map — normalised to the span the picture already has, so depth is a tilt of
+ * the same map and not a spike beside it. That is gravity, without inventing a hierarchy.
  */
 export function toForceGraph(
   kg: Kg,
@@ -59,16 +61,56 @@ export function toForceGraph(
 ): ForceGraphData {
   const nodes: ForceNode[] = []
   const skip = hidden ?? new Set<string>()
+
+  // One pass for the three numbers the depth needs: does anything carry a level, how wide the
+  // picture already is, and what range the weights span. A depth axis longer than the drawing
+  // is what makes a 3D view look like a mistake.
+  let anyLevel = false
+  let wMin = Infinity
+  let wMax = -Infinity
+  let xMin = Infinity
+  let xMax = -Infinity
+  let yMin = Infinity
+  let yMax = -Infinity
   kg.graph.forEachNode((id, a) => {
     if (skip.has(id)) return
+    if (typeof a.level === 'number') anyLevel = true
+    const w = typeof a.weight === 'number' ? a.weight : 0
+    if (w < wMin) wMin = w
+    if (w > wMax) wMax = w
+    if (typeof a.x === 'number') {
+      xMin = Math.min(xMin, a.x)
+      xMax = Math.max(xMax, a.x)
+    }
+    if (typeof a.y === 'number') {
+      yMin = Math.min(yMin, a.y)
+      yMax = Math.max(yMax, a.y)
+    }
+  })
+  const span = Math.max(xMax - xMin, yMax - yMin)
+  const depth = Number.isFinite(span) && span > 0 ? span * 0.35 : 0
+  const byWeight = (w: number) =>
+    wMax > wMin ? (w - wMin) / (wMax - wMin) : 0.5
+
+  kg.graph.forEachNode((id, a) => {
+    if (skip.has(id)) return
+    const w = typeof a.weight === 'number' ? a.weight : 0
+    const z = typeof a.level === 'number'
+      ? -a.level * zScale
+      : anyLevel || depth === 0
+        ? 0
+        : -(byWeight(w) - 0.5) * depth
     const node: ForceNode = {
       id,
       label: typeof a.label === 'string' ? a.label : id,
       kind: typeof a.kind === 'string' ? a.kind : 'unknown',
       color: typeof a.color === 'string' ? a.color : '#7b9ecb',
       size: typeof a.px === 'number' ? a.px : typeof a.size === 'number' ? a.size : 2,
-      z: typeof a.level === 'number' ? -a.level * zScale : 0,
+      z,
     }
+    // Weight fixes the depth only where there is no hierarchy to read: the force layout keeps
+    // arranging x and y, and the node keeps its own height instead of drifting in z.
+    if (!anyLevel && depth > 0) node.fz = z
     if (typeof a.x === 'number') node.x = a.x
     if (typeof a.y === 'number') node.y = a.y
     if (pin && typeof node.x === 'number' && typeof node.y === 'number') {
