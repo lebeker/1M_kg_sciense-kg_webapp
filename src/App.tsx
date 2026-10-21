@@ -705,10 +705,23 @@ export default function App() {
       if (kg.graph.hasEdge(k)) kg.graph.dropEdge(k)
     })
     aggRef.current = new Set()
+    // A fold-invented edge wears the clothes of the relation it stands for: a dotted `overlaps`
+    // lifted to two categories must still be dotted, or every summary of the map comes out grey
+    // and the legend stops explaining the picture.
+    const decls =
+      (kg.meta as unknown as { edges?: Record<string, unknown>[] } | undefined)?.edges ?? []
+    const declOf = (label: string) => decls.find((d) => d.name === label || d.label === label)
     sim.virtual.forEach((v, i) => {
       if (!kg.graph.hasNode(v.a) || !kg.graph.hasNode(v.b)) return
       const key = `fold:${i}:${v.a}--${v.b}`
-      if (!kg.graph.hasEdge(key)) kg.graph.addEdgeWithKey(key, v.a, v.b, { agg: true, power: v.power, label: v.label })
+      const decl = declOf(v.label) ?? {}
+      const look: Record<string, unknown> = {}
+      for (const k of ['color', 'dash', 'style', 'dir'] as const) {
+        if (decl[k] !== undefined) look[k] = decl[k]
+      }
+      if (!kg.graph.hasEdge(key)) {
+        kg.graph.addEdgeWithKey(key, v.a, v.b, { agg: true, power: v.power, label: v.label, ...look })
+      }
       aggRef.current.add(key)
     })
     setGraphVersion((v) => v + 1)

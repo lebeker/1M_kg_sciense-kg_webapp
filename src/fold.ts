@@ -362,6 +362,11 @@ export function foldState(
   kg.graph.forEachEdge((_key, attrs, s, t) => {
     const a = attrs as Record<string, unknown>
     if (a.agg) return
+    // A work is evidence *inside* a host: its `about` and `cites` describe what the host
+    // contains, not what the host relates to. Lifting those would draw one line per pair of
+    // categories for a fact the ring around the node already states — and a six-node map would
+    // come out as a hairball. Structure lifts; evidence stays inside.
+    if (kindOf(kg, s) === 'publication' || kindOf(kg, t) === 'publication') return
     const from = survivorOf(s)
     const to = survivorOf(t)
     if (!from.length || !to.length) return
