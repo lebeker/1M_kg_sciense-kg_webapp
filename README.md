@@ -1,7 +1,10 @@
 # kg-viewer
 
 A React viewer for a `kg/1` knowledge-graph document — the web-app half of a
-knowledge-graph skill. It builds to **one self-contained HTML file** with every
+knowledge-graph skill.
+
+**A worked case:** <https://lebeker.github.io/1M_kg_sciense-kg_webapp/> — one article on the
+neurokinin antagonist class, the document it came from, and the page it renders into. It builds to **one self-contained HTML file** with every
 script and style inlined, so it opens from `file://` with no server, no network
 and no build step on the reader's machine.
 
