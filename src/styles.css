@@ -458,6 +458,10 @@ button.link {
   cursor: pointer;
   font: inherit;
   text-align: left;
+  /* The chevron sits on the text's baseline: inline-flex keeps it from hanging off the line. */
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 button.tiny {
   border: 1px solid var(--border-soft);
@@ -675,18 +679,39 @@ button.tiny:hover, button.link:hover { color: var(--accent-soft); }
 
 .legend-head .fold,
 .legend-bar .expand {
-  border: 0;
-  background: none;
-  color: var(--muted);
+  /* A control that says "there is more here", drawn at the weight of every other icon button
+     in the page. As a 9px text glyph in the muted colour it was there and not visible. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--fg) 30%, transparent);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--fg);
   font: inherit;
   line-height: 1;
-  padding: 2px 4px;
   cursor: pointer;
 }
 
 .legend-head .fold:hover,
 .legend-bar .expand:hover {
-  color: var(--fg);
+  color: var(--accent-soft);
+  border-color: var(--accent-soft);
+}
+
+.chev {
+  display: block;
+  flex: none;
+}
+
+/* In the panel the mark sits beside a small-caps label, so it takes the link's colour and a
+   little more room than the text would give it. */
+button.link .chev {
+  margin-right: 1px;
 }
 
 .legend-bar {
@@ -744,15 +769,31 @@ button.tiny:hover, button.link:hover { color: var(--accent-soft); }
   overflow: visible;
 }
 
+/* A disclosure in the panel is a control, not a heading: "connections 12" is the one thing on
+   that line you can click, so it carries the accent and its chevron with it. */
 .panel h3 .link {
   font: inherit;
-  color: inherit;
+  color: var(--accent);
   letter-spacing: inherit;
   text-transform: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .panel h3 .link:hover {
-  color: var(--fg);
+  color: var(--accent-soft);
+}
+
+.group-head .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+}
+
+.group-head .link:hover {
+  color: var(--accent-soft);
 }
 
 /* x/y or force: a two-position switch, the same shape as 2D/3D, because it is the same kind of

@@ -123,6 +123,36 @@ function renderValue(v: unknown) {
 export type LabelMode = 'on' | 'hover' | 'off'
 
 /** Three positions, and no menu: a reader changes how much text is on the map in one click. */
+/**
+ * The page's one disclosure mark.
+ *
+ * A chevron points where the content will go: right when there is something to open, down
+ * when it is already open. It used to be a text glyph ("▸", "▴") at the inherited size in the
+ * muted colour — invisible at a glance, and in the legend pointing *up* while the panel folded
+ * away, which read as the opposite of what it does.
+ */
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      className="chev"
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      aria-hidden="true"
+      data-chev={open ? 'open' : 'closed'}
+    >
+      <path
+        d={open ? 'M6 9l6 6 6-6' : 'M9 6l6 6-6 6'}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function LabelSwitch({ mode, onChange }: { mode: LabelMode; onChange: (m: LabelMode) => void }) {
   return (
     <span className="labels" role="group" aria-label="node labels">
@@ -1050,7 +1080,7 @@ export default function App() {
                 title="open the legend"
                 onClick={() => setLegendOpen(true)}
               >
-                ▸
+                <Chevron open={false} />
               </button>
               <span className="counts">
                 NODES <b>{kg.graph.order}</b> · EDGES <b>{kg.graph.size}</b>
@@ -1070,7 +1100,7 @@ export default function App() {
                   title="fold the legend away"
                   onClick={() => setLegendOpen(false)}
                 >
-                  ▴
+                  <Chevron open={true} />
                 </button>
               </div>
               {/* The eye is the control. A row that is off keeps its word and its count — the map is
@@ -1322,7 +1352,7 @@ export default function App() {
                   data-conn-toggle={connOpen ? 'open' : 'closed'}
                   onClick={() => setConnOpen((v) => !v)}
                 >
-                  {connOpen ? '▾' : '▸'} connections <i>{connections.length}</i>
+                  <Chevron open={connOpen} /> connections <i>{connections.length}</i>
                 </button>
               </h3>
               {(connOpen ? groups : []).map((g) => (
@@ -1339,7 +1369,7 @@ export default function App() {
                         })
                       }
                     >
-                      {folded.has(g.rel) ? '▸' : '▾'} {g.rel}
+                      <Chevron open={!folded.has(g.rel)} /> {g.rel}
                     </button>
                     <i>{g.conns.length}</i>
                   </div>
