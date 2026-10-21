@@ -111,8 +111,9 @@ figcaption{color:var(--muted);font-size:12.5px;margin-top:6px}
         shows <code>x/y</code> greyed out. The document may declare a default
         (<code>meta.layout</code>); this switch overrules it for the reading.</li>
     <li><b>2D / 3D</b> — the same document, drawn flat or in space. With <code>x/y</code> the 3D
-        view holds every node where the document put it and uses <code>level</code> as depth, so
-        the two views are one picture from two angles.</li>
+        view holds every node where the document put it; depth comes from <code>level</code> when
+        the document has one, and from <code>weight</code> — scaled to the width of the picture —
+        when it does not. The two views are one map from two angles.</li>
   </ul>
 
   <h2><span class="n">2</span>The legend</h2>
