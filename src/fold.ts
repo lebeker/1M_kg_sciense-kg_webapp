@@ -133,9 +133,16 @@ export function subtreeOf(kg: Kg, root: string, muted: Set<string>): string[] {
 
 export function foldState(
   kg: Kg,
-  opts: { muted: Set<string>; steps: FoldStep[]; kinds: Set<string>; foldAll?: boolean },
+  opts: {
+    muted: Set<string>
+    steps: FoldStep[]
+    kinds: Set<string>
+    foldAll?: boolean
+    /** Branches the reader opened while the whole map is folded. */
+    open?: Set<string>
+  },
 ): FoldState {
-  const { muted, steps, kinds, foldAll } = opts
+  const { muted, steps, kinds, foldAll, open } = opts
   const adj = buildAdj(kg, muted)
   const hidden = new Set<string>()
   const absorbed = new Map<string, Absorbed>()
@@ -292,13 +299,27 @@ export function foldState(
     // Fold the map up to its categories: every node that is not on the top layer goes into the
     // layer above it, deepest first. What is left is the category graph, each node carrying what
     // it absorbed.
+    //
+    // A branch the reader opened keeps its own next layer. "Only categories" is a way of reading
+    // a map, not a lock: opening one category asks to see one step down *there*, while the rest
+    // of the map stays folded. Without that, a fold made by the legend could only be undone by
+    // undoing the whole reading.
+    const keep = new Set<string>()
     let top = Number.POSITIVE_INFINITY
     kg.graph.forEachNode((id) => {
       top = Math.min(top, levelOf(kg, id))
     })
+    kg.graph.forEachNode((id) => {
+      if (levelOf(kg, id) === top) keep.add(id)
+    })
+    const opened = [...(open ?? [])].sort((a, b) => levelOf(kg, a) - levelOf(kg, b) || a.localeCompare(b))
+    for (const id of opened) {
+      if (!kg.graph.hasNode(id)) continue
+      for (const child of nextLayer(id)) keep.add(child)
+    }
     const ids: string[] = []
     kg.graph.forEachNode((id) => {
-      if (levelOf(kg, id) > top) ids.push(id)
+      if (!keep.has(id)) ids.push(id)
     })
     ids.sort((a, b) => levelOf(kg, b) - levelOf(kg, a) || a.localeCompare(b))
     for (const id of ids) if (visible(id)) foldOne(id)

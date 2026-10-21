@@ -1,0 +1,552 @@
+{
+ "meta": {
+  "title": "Lynkuet \u2014 schematic timeline (2012-2026)",
+  "schema": "kg/1",
+  "limits": {
+   "nodes": 500,
+   "edges": 5000
+  },
+  "app": "viewer",
+  "app_url": "https://raw.githubusercontent.com/lebeker/1M_kg_sciense-kg_webapp/viewer-v0.0.37/viewer.html",
+  "requires": {
+   "skills": [
+    "kg",
+    "citations",
+    "paper-search",
+    "tech-area",
+    "co-citations"
+   ],
+   "plugins": [],
+   "tools": [
+    "openalex"
+   ]
+  },
+  "edges": [
+   {
+    "name": "authored",
+    "dir": "in",
+    "from": [
+     "researcher"
+    ],
+    "to": [
+     "publication"
+    ]
+   },
+   {
+    "name": "about",
+    "dir": "out",
+    "from": [
+     "publication"
+    ],
+    "to": [
+     "subject"
+    ]
+   },
+   {
+    "name": "works at",
+    "dir": "out",
+    "from": [
+     "researcher"
+    ],
+    "to": [
+     "institution"
+    ]
+   },
+   {
+    "name": "cites",
+    "dir": "in",
+    "from": [
+     "publication"
+    ],
+    "to": [
+     "publication"
+    ],
+    "color": "#3f6fd8",
+    "style": "arrow"
+   },
+   {
+    "name": "co-cited",
+    "dir": "none",
+    "from": [
+     "publication"
+    ],
+    "to": [
+     "publication"
+    ],
+    "color": "#6b7a90",
+    "style": "dotted"
+   }
+  ],
+  "colors": {
+   "have": "#4a9d7f",
+   "want": "#4a7dc9",
+   "threat": "#c0392b",
+   "action": "#e08a1e",
+   "skull": "#6b6b6b",
+   "organ": "#a05195",
+   "condition": "#d45087",
+   "protocol": "#2e8b8b",
+   "research": "#7f6ad4",
+   "marker": "#e6a817",
+   "evidence": "#8d99ae",
+   "treatment": "#e07a5f",
+   "publication": "#cdd9e5",
+   "researcher": "#d47fa6",
+   "scientist": "#d47fa6",
+   "subject": "#7b9ecb",
+   "concept": "#7b9ecb",
+   "lab": "#93c47d",
+   "company": "#f5a623",
+   "institution": "#9aa0a6",
+   "person": "#d47fa6",
+   "goal": "#66c2a5",
+   "project": "#8da0cb",
+   "default": "#888888",
+   "drug": "#e4572e"
+  }
+ },
+ "nodes": [
+  {
+   "id": "lynkuet",
+   "label": "Lynkuet (elinzanetant)",
+   "kind": "drug",
+   "style": "solid",
+   "desc": "Bayer's dual NK1/NK3 receptor antagonist, approved by the FDA on 24 October 2025 as Lynkuet 60 mg capsules (120 mg once daily at bedtime) for moderate-to-severe vasomotor symptoms due to menopause; it is the first dual NK1/NK3 antagonist approved for this indication.",
+   "link": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/219469s000lbl.pdf",
+   "brand": "Lynkuet",
+   "inn": "elinzanetant",
+   "sponsor": "Bayer",
+   "mechanism": "NK1 + NK3 receptor antagonist",
+   "status": "approved (US)",
+   "approval_date": "2025-10-24",
+   "agency": "FDA",
+   "dosage": "120 mg (two 60 mg capsules) once daily at bedtime",
+   "boxed_warning": "none",
+   "hepatic_monitoring": "baseline ALT/AST/ALP/bilirubin; repeat at 3 months",
+   "cns_effects": "somnolence and other nervous-system effects in 11.9% vs 3.5% placebo",
+   "source": "FDA prescribing information, NDA 219469, revised 10/2025",
+   "level": 2.0,
+   "desc_rev": 0,
+   "x": 990.0,
+   "y": 280.0
+  },
+  {
+   "id": "veozah",
+   "label": "Veozah (fezolinetant)",
+   "kind": "drug",
+   "style": "solid",
+   "desc": "Astellas's selective NK3 receptor antagonist, approved by the FDA on 12 May 2023 as Veozah 45 mg tablets for moderate-to-severe vasomotor symptoms due to menopause; a boxed warning for hepatotoxicity was added in December 2024.",
+   "link": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/216578s004lbl.pdf",
+   "brand": "Veozah",
+   "inn": "fezolinetant",
+   "sponsor": "Astellas",
+   "mechanism": "selective NK3 receptor antagonist",
+   "status": "approved (US)",
+   "approval_date": "2023-05-12",
+   "agency": "FDA",
+   "dosage": "45 mg once daily",
+   "boxed_warning": "hepatotoxicity (added 12/2024)",
+   "hepatic_monitoring": "baseline; monthly for first 3 months, then at 6 and 9 months",
+   "source": "FDA prescribing information, NDA 216578, revised 12/2024",
+   "level": 2.0,
+   "desc_rev": 0,
+   "x": 690.0,
+   "y": 280.0
+  },
+  {
+   "id": "oasis12",
+   "label": "OASIS-1 and OASIS-2: elinzanetant phase 3 efficacy (JAMA 2024)",
+   "kind": "publication",
+   "style": "solid",
+   "desc": "Two randomised, double-blind, placebo-controlled phase 3 trials enrolled postmenopausal women aged 40-65 with moderate-to-severe vasomotor symptoms at 77 sites each in the US, Europe, Canada and Israel. Participants received elinzanetant 120 mg once daily for 26 weeks, or placebo for 12 weeks followed by elinzanetant for 14 weeks. The co-primary endpoints were change in VMS frequency and severity at weeks 4 and 12, recorded in an electronic hot-flash diary. Elinzanetant reduced VMS frequency versus placebo by 3.3 episodes per 24 hours at week 4 and 3.2 at week 12 in OASIS-1, and by 3.0 and 3.2 in OASIS-2. Severity also fell significantly at both time points in both trials. Sleep disturbance and menopause-specific quality of life improved at week 12, and the safety profile was favourable. The report is the primary efficacy publication for OASIS-1 and OASIS-2.",
+   "link": "",
+   "doi": "10.1001/jama.2024.14618",
+   "venue": "JAMA",
+   "year": 2024.0,
+   "cited_by": 113.0,
+   "cited_by_source": "OpenAlex",
+   "cited_by_at": "2026-10-20",
+   "publication_type": "trial report",
+   "nct": "NCT05042362; NCT05099159",
+   "phase": 3.0,
+   "level": 2.5,
+   "desc_rev": 0,
+   "x": 840.0,
+   "y": 0.0
+  },
+  {
+   "id": "oasis3",
+   "label": "OASIS-3: 52-week safety and efficacy (JAMA Internal Medicine 2025)",
+   "kind": "publication",
+   "style": "solid",
+   "desc": "OASIS-3 was a double-blind, placebo-controlled phase 3 trial at 83 sites in North America and Europe, enrolling 628 postmenopausal women aged 40-65 who sought treatment for moderate-to-severe VMS without a minimum weekly event count. Participants received elinzanetant 120 mg or placebo once daily for 52 weeks. The primary endpoint was change in daily moderate-to-severe VMS frequency from baseline to week 12; secondary and exploratory endpoints covered sleep disturbance, quality of life and longer-term VMS change. At week 12 elinzanetant reduced VMS frequency by 5.4 episodes per day versus 3.5 with placebo, a least-squares mean difference of -1.6 (95% CI -2.0 to -1.1; P<.001). Descriptive analyses favoured elinzanetant for VMS frequency and severity over 50 weeks and for sleep and quality of life over 52 weeks. The authors report no hepatotoxic or endometrial safety signal over the 52-week exposure.",
+   "link": "",
+   "doi": "10.1001/jamainternmed.2025.4421",
+   "venue": "JAMA Internal Medicine",
+   "year": 2025.0,
+   "cited_by": 43.0,
+   "cited_by_source": "OpenAlex",
+   "cited_by_at": "2026-10-20",
+   "publication_type": "trial report",
+   "phase": 3.0,
+   "level": 2.5,
+   "desc_rev": 0,
+   "x": 960.0,
+   "y": 0.0,
+   "nct": "NCT05030584"
+  },
+  {
+   "id": "oasis4",
+   "label": "OASIS-4: elinzanetant in breast-cancer endocrine therapy (NEJM 2025)",
+   "kind": "publication",
+   "style": "solid",
+   "desc": "OASIS-4 was a phase 3 trial in women aged 18-70 with moderate-to-severe VMS caused by endocrine therapy for HR-positive breast cancer or its prevention. Participants were randomised 2:1 to elinzanetant 120 mg for 52 weeks or placebo for 12 weeks followed by elinzanetant for 40 weeks. The primary endpoints were change in mean daily VMS frequency at weeks 4 and 12. Elinzanetant reduced VMS frequency by 6.5 episodes per day at week 4 versus 3.0 with placebo, and by 7.8 versus 4.2 at week 12 (least-squares mean difference -3.4; 95% CI -4.2 to -2.5; P<0.001). Headache, fatigue and somnolence were the most common adverse events; serious adverse events occurred in 2.5% of the elinzanetant group and 0.6% of placebo during weeks 1-12. The trial was funded by Bayer.",
+   "link": "",
+   "doi": "10.1056/NEJMoa2415566",
+   "venue": "New England Journal of Medicine",
+   "year": 2025.0,
+   "cited_by": 61.0,
+   "cited_by_source": "OpenAlex",
+   "cited_by_at": "2026-10-20",
+   "publication_type": "trial report",
+   "nct": "NCT05587296",
+   "phase": 3.0,
+   "level": 2.5,
+   "desc_rev": 0,
+   "x": 1020.0,
+   "y": 0.0
+  },
+  {
+   "id": "sky1",
+   "label": "SKYLIGHT 1: fezolinetant phase 3 (Lancet 2023)",
+   "kind": "publication",
+   "style": "solid",
+   "desc": "SKYLIGHT 1 was a randomised, double-blind, placebo-controlled 12-week phase 3 trial with a 40-week active-treatment extension, conducted at 97 sites in the USA, Canada, Czech Republic, Hungary, Poland, Spain and the UK. Women aged 40-65 with at least seven moderate-to-severe hot flashes per day were randomised 1:1:1 to placebo, fezolinetant 30 mg or fezolinetant 45 mg once daily. Co-primary endpoints were change in VMS frequency and severity at weeks 4 and 12. Compared with placebo, fezolinetant 30 mg and 45 mg reduced VMS frequency at week 4 (least-squares mean differences -1.87 and -2.07) and week 12 (-2.39 and -2.55), all p<0.001. Severity also improved at both doses and time points. Treatment-emergent adverse events occurred in 37% of the 30 mg group, 43% of the 45 mg group and 45% of placebo, and liver-enzyme elevations were uncommon. The trial is registered as NCT04003155 and was funded by Astellas Pharma.",
+   "link": "",
+   "doi": "10.1016/S0140-6736(23)00085-5",
+   "venue": "The Lancet",
+   "year": 2023.0,
+   "cited_by": 269.0,
+   "cited_by_source": "OpenAlex",
+   "cited_by_at": "2026-10-20",
+   "publication_type": "trial report",
+   "nct": "NCT04003155",
+   "phase": 3.0,
+   "level": 2.5,
+   "desc_rev": 0,
+   "x": 660.0,
+   "y": 0.0
+  },
+  {
+   "id": "sky2",
+   "label": "SKYLIGHT 2: fezolinetant phase 3 (JCEM 2023)",
+   "kind": "publication",
+   "style": "solid",
+   "desc": "SKYLIGHT 2 was a double-blind, placebo-controlled 12-week phase 3 trial with a 40-week active-treatment extension, enrolling women aged 40-65 with at least seven moderate-to-severe VMS per day. Participants were randomised to once-daily placebo, fezolinetant 30 mg or fezolinetant 45 mg for 12 weeks; completers were re-randomised to fezolinetant for 40 more weeks. Both doses significantly reduced VMS frequency and severity versus placebo at weeks 4 and 12. For frequency, the week-12 least-squares mean reductions versus placebo were -1.86 (30 mg) and -2.53 (45 mg), both p<0.001. Improvement was observed by week 1 and maintained through week 52, and serious treatment-emergent adverse events were infrequent. The trial is registered as NCT04003142.",
+   "link": "",
+   "doi": "10.1210/clinem/dgad058",
+   "venue": "Journal of Clinical Endocrinology & Metabolism",
+   "year": 2023.0,
+   "cited_by": 205.0,
+   "cited_by_source": "OpenAlex",
+   "cited_by_at": "2026-10-20",
+   "publication_type": "trial report",
+   "nct": "NCT04003142",
+   "phase": 3.0,
+   "level": 2.5,
+   "desc_rev": 0,
+   "x": 720.0,
+   "y": 0.0
+  },
+  {
+   "id": "rance2013",
+   "label": "Rance et al. 2013: the KNDy hypothesis of hot flushes",
+   "kind": "publication",
+   "style": "solid",
+   "desc": "This review sets out the physiology of hot flushes, the CNS pathways that drive heat-dissipation effectors, and the effects of oestrogen on thermoregulation in animal models. The authors note marked changes in hypothalamic kisspeptin/neurokinin B/dynorphin (KNDy) neurons in postmenopausal women and hypothesise that these neurons participate in flush generation. In the rat, KNDy neurons project to preoptic thermoregulatory areas that express the neurokinin 3 receptor (NK3R), the primary receptor for neurokinin B. Activation of NK3R in the median preoptic nucleus, part of the heat-defence pathway, lowers body temperature, and ablation of KNDy neurons reduces cutaneous vasodilatation and partly blocks oestrogen effects on thermoregulation. The paper is the canonical statement of the KNDy hypothesis that later NK3 and dual NK1/NK3 drug programmes were built on.",
+   "link": "",
+   "doi": "10.1016/j.yfrne.2013.07.003",
+   "venue": "Frontiers in Neuroendocrinology",
+   "year": 2013.0,
+   "cited_by": 378.0,
+   "cited_by_source": "OpenAlex",
+   "cited_by_at": "2026-10-20",
+   "publication_type": "analysis",
+   "level": 2.5,
+   "desc_rev": 0,
+   "x": 420.0,
+   "y": 200.0
+  },
+  {
+   "id": "mittelman2012",
+   "label": "Mittelman-Smith et al. 2012: KNDy neurons and cutaneous vasodilatation",
+   "kind": "publication",
+   "style": "solid",
+   "desc": "The study tested whether hypothalamic KNDy neurons contribute to the generation of hot flushes by ablating them in the rat arcuate nucleus with an NK3-saporin conjugate. KNDy ablation consistently lowered tail-skin temperature, indicating that these neurons facilitate cutaneous vasodilatation, a major heat-dissipation effector. Ablation also blocked the light-phase reduction in tail-skin temperature produced by 17beta-estradiol, without affecting the dark-phase response. At an ambient temperature of 33 degrees C, core temperature was lower in ovariectomised KNDy-ablated rats than in ovariectomised controls and was not altered by estradiol replacement. The authors conclude that KNDy neurons promote cutaneous vasodilatation and participate in estradiol modulation of body temperature, supporting a role in flush generation.",
+   "link": "",
+   "doi": "10.1073/pnas.1211517109",
+   "venue": "PNAS",
+   "year": 2012.0,
+   "cited_by": 207.0,
+   "cited_by_source": "OpenAlex",
+   "cited_by_at": "2026-10-20",
+   "publication_type": "analysis",
+   "level": 2.5,
+   "desc_rev": 0,
+   "x": 340.0,
+   "y": 200.0
+  },
+  {
+   "id": "safety2026",
+   "label": "Pooled safety of elinzanetant across four RCTs (eClinicalMedicine 2026)",
+   "kind": "publication",
+   "style": "solid",
+   "desc": "This pooled safety analysis combined four randomised, placebo-controlled studies: the phase 2b SWITCH-1 trial (2018-2019) and the phase 3 OASIS-1, OASIS-2 and OASIS-3 trials (2021-2024). The 12-week set included 1519 participants (765 elinzanetant 120 mg, 754 placebo); the 52-week set included 1113 elinzanetant-treated participants and 754 placebo participants. Treatment-emergent adverse events occurred in 50.8% versus 43.2% over 12 weeks, while exposure-adjusted incidence rates over 52 weeks were 196.61 versus 209.00 per 100 person-years. Headache, fatigue and somnolence were the most common events with elinzanetant. Treatment discontinuation with elinzanetant was 7.8% versus 3.6% with placebo over 12 weeks. There were no Hy's Law cases or indication of cholestatic injury, and malignant-tumour incidence had overlapping confidence intervals between groups. The authors call the profile favourable and ask for time-to-event analyses and real-world post-marketing data.",
+   "link": "",
+   "doi": "10.1016/j.eclinm.2026.104250",
+   "venue": "eClinicalMedicine",
+   "year": 2026.0,
+   "cited_by": 0.0,
+   "cited_by_source": "OpenAlex",
+   "cited_by_at": "2026-10-20",
+   "publication_type": "trial report",
+   "nct": "SWITCH-1; OASIS-1; OASIS-2; OASIS-3",
+   "phase": "2b/3",
+   "level": 2.5,
+   "desc_rev": 0,
+   "x": 1100.0,
+   "y": -200.0
+  },
+  {
+   "id": "teli2026",
+   "label": "Elinzanetant: dual NK1/NK3 antagonism review (J Menopausal Med 2026)",
+   "kind": "publication",
+   "style": "solid",
+   "desc": "This review assesses the role of elinzanetant after its FDA approval as the first dual NK1/NK3 receptor antagonist for menopausal VMS. It frames VMS pathogenesis around the hypothalamic KNDy neuron network and neurokinin B signalling through NK3. The authors argue that blocking NK3 controls VMS while NK1 blockade addresses mood and sleep, and they summarise the OASIS phase 3 programme, including a 65.2%-67.0% reduction in VMS frequency by week 12 in OASIS-1/2 and improvement in the PROMIS sleep-disturbance score. They note that indirect cross-study comparisons with fezolinetant suggest a numerical sleep advantage for elinzanetant but that head-to-head trials are required. The review describes a favourable long-term liver-safety profile and concludes that elinzanetant represents a shift in non-hormonal VMS treatment.",
+   "link": "",
+   "doi": "10.6118/jmm.25157",
+   "venue": "Journal of Menopausal Medicine",
+   "year": 2026.0,
+   "cited_by": 0.0,
+   "cited_by_source": "OpenAlex",
+   "cited_by_at": "2026-10-20",
+   "publication_type": "review",
+   "level": 2.5,
+   "desc_rev": 0,
+   "x": 1160.0,
+   "y": -200.0
+  },
+  {
+   "id": "realworld-hep",
+   "label": "Hepatic adverse-event signals of fezolinetant in real-world use (Obstet Gynecol 2026)",
+   "kind": "publication",
+   "style": "solid",
+   "desc": "This retrospective disproportionality analysis used the FDA Adverse Event Reporting System from the second quarter of 2023 through the second quarter of 2025 to evaluate hepatic reporting for fezolinetant after approval and after the FDA boxed warning. Among 1282 fezolinetant-associated reports, a hepatic adverse-event signal was identified, predominantly liver-enzyme elevations rather than clinically overt injury. Marked disproportionality appeared for alanine aminotransferase, aspartate aminotransferase and liver-function-test increases. Median time to onset of hepatic events was 77 days (IQR 30-149), with a Weibull shape parameter consistent with an early-failure pattern. The authors conclude that baseline assessment and early-phase monitoring matter, while continued clinical vigilance is warranted.",
+   "link": "",
+   "doi": "10.1097/AOG.0000000000006331",
+   "venue": "Obstetrics & Gynecology",
+   "year": 2026.0,
+   "cited_by": 0.0,
+   "cited_by_source": "OpenAlex",
+   "cited_by_at": "2026-10-20",
+   "publication_type": "analysis",
+   "level": 2.5,
+   "desc_rev": 0,
+   "x": 1220.0,
+   "y": -200.0
+  },
+  {
+   "id": "realworld-faers",
+   "label": "Real-world safety profile of fezolinetant from FAERS (Naunyn-Schmiedeberg's Arch Pharmacol 2026)",
+   "kind": "publication",
+   "style": "solid",
+   "desc": "This study applied four disproportionality algorithms to the FDA Adverse Event Reporting System from the second quarter of 2023 through the first quarter of 2026, keeping unique cases with fezolinetant as the primary suspect drug. A total of 1757 cases involving 3391 adverse events were analysed, mostly in women. Twenty preferred terms were positive across all four algorithms; liver-related laboratory abnormalities were prominent, including raised aspartate aminotransferase (ROR 41.72), alanine aminotransferase (ROR 48.31) and gamma-glutamyltransferase (ROR 33.58). The study also found disproportionate reporting of cholestatic laboratory abnormalities and a novel nightmare signal that weakened in a physician-only sensitivity analysis. Median event onset was 38 days, with most events in the first 100 days, consistent with the latency of serious hepatotoxicity in FDA warnings.",
+   "link": "",
+   "doi": "10.1007/s00210-026-05773-0",
+   "venue": "Naunyn-Schmiedeberg's Archives of Pharmacology",
+   "year": 2026.0,
+   "cited_by": 0.0,
+   "cited_by_source": "OpenAlex",
+   "cited_by_at": "2026-10-20",
+   "publication_type": "analysis",
+   "level": 2.5,
+   "desc_rev": 0,
+   "x": 1280.0,
+   "y": -200.0
+  },
+  {
+   "id": "nma2023",
+   "label": "Fezolinetant network meta-analysis (Menopause 2023)",
+   "kind": "publication",
+   "style": "solid",
+   "desc": "This systematic review and Bayesian network meta-analysis compared fezolinetant 45 mg with hormone therapy and non-hormone therapies for moderate-to-severe VMS. It pooled the two phase 3 fezolinetant trials with 23 comparator publications across frequency, severity and responder outcomes. Changes in VMS frequency did not differ significantly between fezolinetant and any of the 27 hormone-therapy regimens studied. Fezolinetant reduced VMS frequency significantly more than paroxetine 7.5 mg, desvenlafaxine 50-200 mg and gabapentin ER 1800 mg, and more than placebo. For severity, tibolone 2.5 mg was the only hormone regimen that significantly outperformed fezolinetant. The comparison set contains no elinzanetant trial, so the analysis cannot answer the class-internal question.",
+   "link": "",
+   "doi": "10.1097/GME.0000000000002281",
+   "venue": "Menopause",
+   "year": 2023.0,
+   "cited_by": 40.0,
+   "cited_by_source": "OpenAlex",
+   "cited_by_at": "2026-10-20",
+   "publication_type": "review",
+   "level": 2.5,
+   "desc_rev": 0,
+   "x": 780.0,
+   "y": 0.0
+  }
+ ],
+ "edges": [
+  {
+   "from": "oasis12",
+   "to": "lynkuet",
+   "label": "reports on",
+   "time": "2024",
+   "style": "solid",
+   "color": "#b08968",
+   "power": 0.9
+  },
+  {
+   "from": "oasis3",
+   "to": "lynkuet",
+   "label": "reports on",
+   "time": "2025",
+   "style": "solid",
+   "color": "#b08968",
+   "power": 0.9
+  },
+  {
+   "from": "oasis4",
+   "to": "lynkuet",
+   "label": "reports on",
+   "time": "2025",
+   "style": "solid",
+   "color": "#b08968",
+   "power": 0.9
+  },
+  {
+   "from": "safety2026",
+   "to": "lynkuet",
+   "label": "reports on",
+   "time": "2026",
+   "style": "solid",
+   "color": "#b08968",
+   "power": 0.9
+  },
+  {
+   "from": "teli2026",
+   "to": "lynkuet",
+   "label": "reports on",
+   "time": "2026",
+   "style": "solid",
+   "color": "#b08968",
+   "power": 0.9
+  },
+  {
+   "from": "sky1",
+   "to": "veozah",
+   "label": "reports on",
+   "time": "2023",
+   "style": "solid",
+   "color": "#b08968",
+   "power": 0.9
+  },
+  {
+   "from": "sky2",
+   "to": "veozah",
+   "label": "reports on",
+   "time": "2023",
+   "style": "solid",
+   "color": "#b08968",
+   "power": 0.9
+  },
+  {
+   "from": "nma2023",
+   "to": "veozah",
+   "label": "reports on",
+   "time": "2023",
+   "style": "solid",
+   "color": "#b08968",
+   "power": 0.9
+  },
+  {
+   "from": "realworld-hep",
+   "to": "veozah",
+   "label": "reports on",
+   "time": "2026",
+   "style": "solid",
+   "color": "#b08968",
+   "power": 0.9
+  },
+  {
+   "from": "realworld-faers",
+   "to": "veozah",
+   "label": "reports on",
+   "time": "2026",
+   "style": "solid",
+   "color": "#b08968",
+   "power": 0.9
+  },
+  {
+   "from": "oasis12",
+   "to": "rance2013",
+   "label": "cites",
+   "time": "2024",
+   "style": "arrow",
+   "color": "#3f6fd8",
+   "power": 0.1
+  },
+  {
+   "from": "oasis3",
+   "to": "rance2013",
+   "label": "cites",
+   "time": "2025",
+   "style": "arrow",
+   "color": "#3f6fd8",
+   "power": 0.1
+  },
+  {
+   "from": "oasis4",
+   "to": "rance2013",
+   "label": "cites",
+   "time": "2025",
+   "style": "arrow",
+   "color": "#3f6fd8",
+   "power": 0.1
+  },
+  {
+   "from": "sky1",
+   "to": "rance2013",
+   "label": "cites",
+   "time": "2023",
+   "style": "arrow",
+   "color": "#3f6fd8",
+   "power": 0.1
+  },
+  {
+   "from": "sky2",
+   "to": "rance2013",
+   "label": "cites",
+   "time": "2023",
+   "style": "arrow",
+   "color": "#3f6fd8",
+   "power": 0.1
+  },
+  {
+   "from": "sky2",
+   "to": "mittelman2012",
+   "label": "cites",
+   "time": "2023",
+   "style": "arrow",
+   "color": "#3f6fd8",
+   "power": 0.1
+  },
+  {
+   "from": "rance2013",
+   "to": "mittelman2012",
+   "label": "cites",
+   "time": "2013",
+   "style": "arrow",
+   "color": "#3f6fd8",
+   "power": 0.1
+  }
+ ]
+}

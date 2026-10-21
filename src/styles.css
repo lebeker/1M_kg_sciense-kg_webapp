@@ -622,6 +622,15 @@ button.tiny:hover, button.link:hover { color: var(--accent-soft); }
 .bar .icon.off {
   opacity: 0.45;
 }
+/* A link drawn as an icon: the same box as the buttons, without the underline a browser gives it. */
+a.bar .icon,
+.bar a.icon {
+  color: var(--muted-foreground);
+  text-decoration: none;
+}
+.bar a.icon:hover {
+  color: var(--accent-soft);
+}
 .bar .icon svg {
   display: block;
 }

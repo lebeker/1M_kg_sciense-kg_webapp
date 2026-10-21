@@ -214,6 +214,8 @@ export default function App() {
   const [graphVersion, setGraphVersion] = useState(0)
   /** Relation groups the panel has folded shut. */
   const [folded, setFolded] = useState<Set<string>>(new Set())
+  /** Branches opened while "only categories" is on: the map stays folded, one category opens. */
+  const [openBranches, setOpenBranches] = useState<Set<string>>(new Set())
   /** Relation words the reader has switched off; the document may state a starting set. */
   const [muted, setMuted] = useState<Set<string>>(new Set())
   /** The node budget measured on this host, and whether the reader has insisted on more. */
@@ -279,9 +281,9 @@ export default function App() {
   const sim = useMemo(
     () =>
       kg
-        ? foldState(kg, { muted, steps: stepList, kinds: hiddenKinds, foldAll })
+        ? foldState(kg, { muted, steps: stepList, kinds: hiddenKinds, foldAll, open: openBranches })
         : { hidden: new Set<string>(), absorbed: new Map(), virtual: [], stuck: new Set<string>() },
-    [kg, muted, stepList, hiddenKinds, foldAll],
+    [kg, muted, stepList, hiddenKinds, foldAll, openBranches],
   )
   const hidden = useMemo(() => new Set<string>([...sim.hidden, ...calHidden]), [sim, calHidden])
 
@@ -543,9 +545,10 @@ export default function App() {
       steps: withStep(stepList, selected, n + 1),
       kinds: hiddenKinds,
       foldAll,
+      open: openBranches,
     })
     return { n: after.hidden.size - sim.hidden.size, byKind: diffKinds(after, sim) }
-  }, [kg, muted, stepList, stepsOf, hiddenKinds, foldAll, selected, sim, diffKinds])
+  }, [kg, muted, stepList, stepsOf, hiddenKinds, foldAll, openBranches, selected, sim, diffKinds])
 
   /** The last layer folded at this node, as it would be if unfold were pressed once. */
   const unfoldPreview = useMemo(() => {
@@ -557,11 +560,35 @@ export default function App() {
       steps: withStep(stepList, selected, n - 1),
       kinds: hiddenKinds,
       foldAll,
+      open: openBranches,
     })
     const back = sim.hidden.size - before.hidden.size
     // Nothing to give back — its host is not on the map, or the step never took anything.
     return back > 0 ? { n: back, byKind: diffKinds(sim, before) } : null
-  }, [kg, muted, stepList, stepsOf, hiddenKinds, foldAll, selected, sim, diffKinds])
+  }, [kg, muted, stepList, stepsOf, hiddenKinds, foldAll, openBranches, selected, sim, diffKinds])
+
+  /**
+   * What "unfold" would bring back under the map-wide fold, and what "fold" would put away
+   * again — the branch itself, since that fold leaves no per-node step to undo.
+   */
+  const insidePreview = useMemo(() => {
+    if (!kg || !foldAll || !selected || !kg.graph.hasNode(selected)) return null
+    const isOpen = openBranches.has(selected)
+    const branched = new Set(openBranches)
+    if (isOpen) branched.delete(selected)
+    else branched.add(selected)
+    const after = foldState(kg, {
+      muted,
+      steps: stepList,
+      kinds: hiddenKinds,
+      foldAll,
+      open: branched,
+    })
+    const delta = isOpen
+      ? { n: after.hidden.size - sim.hidden.size, byKind: diffKinds(after, sim) }
+      : { n: sim.hidden.size - after.hidden.size, byKind: diffKinds(sim, after) }
+    return delta.n > 0 ? { n: delta.n, byKind: delta.byKind, open: isOpen } : null
+  }, [kg, foldAll, selected, openBranches, muted, stepList, hiddenKinds, sim, diffKinds])
 
   /** "2 nodes (1 paper, 1 scientist)" — the count alone made the second one look like a bug. */
   const say = useCallback((p: { n: number; byKind: Map<string, number> } | null) => {
@@ -592,8 +619,19 @@ export default function App() {
     })
   }, [])
 
-  /** Bring back what is folded inside one node, without touching the rest of the map. */
+  /**
+   * Bring back what is folded inside one node, without touching the rest of the map.
+   *
+   * Two different folds can have put something inside a node: the reader's own step, and the
+   * map-wide "only categories". The first is undone by dropping the step; the second has no
+   * step to drop, so the branch is recorded as open and the fold keeps it that way.
+   */
   const showInside = useCallback((id: string) => {
+    if (foldAll) {
+      setOpenBranches((prev) => (prev.has(id) ? prev : new Set(prev).add(id)))
+      setSelected(id)
+      return
+    }
     setFoldSteps((prev) => {
       if (!prev.has(id)) return prev
       const next = new Map(prev)
@@ -614,6 +652,16 @@ export default function App() {
       next.delete(id)
       return next
     })
+  }, [foldAll])
+
+  /** The opposite, for a branch opened under the map-wide fold. */
+  const foldInside = useCallback((id: string) => {
+    setOpenBranches((prev) => {
+      if (!prev.has(id)) return prev
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
   }, [])
 
   const revealAll = useCallback(() => {
@@ -627,6 +675,7 @@ export default function App() {
       setDrawAllAnyway(true)
     }
     setFoldSteps(new Map())
+    setOpenBranches(new Set())
     setFoldAll(false)
     setHiddenKinds(new Set())
     setCalHidden(new Set())
@@ -859,6 +908,37 @@ export default function App() {
               </svg>
             </button>
           ) : null}
+
+          {/* The page's own address. A self-contained file still knows where it lives, and a
+              reader who closes the tab should be able to get back to it without being told the
+              path by whoever made it. Clicking opens the same page in a tab of its own. */}
+          <a
+            className="icon page-link"
+            data-page-link={location.href}
+            href={location.href}
+            target="_blank"
+            rel="noreferrer"
+            title={`this page — ${location.href}`}
+            aria-label="this page"
+          >
+            {/* a chain: two links joined */}
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path
+                d="M10.2 13.8a4.3 4.3 0 0 0 6.1 0l2.4-2.4a4.3 4.3 0 0 0-6.1-6.1l-1.2 1.2"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <path
+                d="M13.8 10.2a4.3 4.3 0 0 0-6.1 0l-2.4 2.4a4.3 4.3 0 0 0 6.1 6.1l1.2-1.2"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </a>
 
           <div className="spacer" />
 
@@ -1115,7 +1195,7 @@ export default function App() {
                       title="put away everything that is not a category — people, papers, labs — and keep what each category absorbed"
                       onClick={() => setFoldAll((v) => !v)}
                     >
-                      {foldAll ? 'unfold' : 'only categories'}
+                      {foldAll ? 'all nodes' : 'only categories'}
                     </button>
                   </h4>
                   <ul className="rels">
@@ -1293,7 +1373,25 @@ export default function App() {
               a control, it is furniture. Each row says what it would move. */}
           {selected ? (
             <div className="foldbars" data-fold-preview={foldPreview?.n ?? ''} data-unfold-preview={unfoldPreview?.n ?? ''}>
-              {(foldPreview?.n ?? 0) > 0 ? (
+              {insidePreview ? (
+                <p className="foldbar">
+                  <button
+                    className="tiny"
+                    data-fold-action={insidePreview.open ? 'fold-back' : 'unfold'}
+                    onClick={() =>
+                      selected && (insidePreview.open ? foldInside(selected) : showInside(selected))
+                    }
+                  >
+                    {insidePreview.open ? 'fold' : 'unfold'}
+                  </button>
+                  <span>
+                    {insidePreview.open
+                      ? `put away ${say(insidePreview)}`
+                      : `bring back ${say(insidePreview)}`}
+                  </span>
+                </p>
+              ) : null}
+              {!foldAll && (foldPreview?.n ?? 0) > 0 ? (
                 <p className="foldbar">
                   <button className="tiny" data-fold-action="fold" onClick={() => fold(selected)}>
                     fold
@@ -1301,7 +1399,7 @@ export default function App() {
                   <span>{`put away ${say(foldPreview)}`}</span>
                 </p>
               ) : null}
-              {unfoldPreview ? (
+              {!foldAll && unfoldPreview ? (
                 <p className="foldbar">
                   <button className="tiny" data-fold-action="unfold" onClick={() => unfold(selected)}>
                     unfold
@@ -1309,7 +1407,7 @@ export default function App() {
                   <span>{`bring back ${say(unfoldPreview)}`}</span>
                 </p>
               ) : null}
-              {(foldPreview?.n ?? 0) === 0 && !unfoldPreview ? (
+              {(foldPreview?.n ?? 0) === 0 && !unfoldPreview && !insidePreview ? (
                 <p className="foldbar">
                   <span>
                     {sim.hidden.has(selected)
@@ -1410,7 +1508,7 @@ export default function App() {
           {Array.isArray(nodeAttrs.tags) && nodeAttrs.tags.length > 0 ? (
             <p className="tags">{nodeAttrs.tags.join(' · ')}</p>
           ) : null}
-          {typeof nodeAttrs.link === 'string' ? (
+          {typeof nodeAttrs.link === 'string' && nodeAttrs.link.trim() ? (
             <a href={nodeAttrs.link} target="_blank" rel="noreferrer">
               {nodeAttrs.link}
             </a>

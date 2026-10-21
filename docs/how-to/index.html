@@ -106,6 +106,9 @@ figcaption{color:var(--muted);font-size:12.5px;margin-top:6px}
     <li><b>☀ / ☾</b> — light or dark. A device preference, remembered in this browser.</li>
     <li><span class="ico"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M9 4H4v5M15 4h5v5M15 20h5v-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><b>fit</b>
         — frame the whole graph again after you have dragged it off-screen.</li>
+    <li><b>this page</b> — the chain icon beside <code>notes</code> is a link to the page's own
+        address. A self-contained file still knows where it lives: click it to open the same map in
+        a tab of its own, or use it to get back after closing the one you had.</li>
     <li><b>x/y · force</b> — where positions come from: the coordinates the document carries, or a
         layout computed from the edges. It governs 2D and 3D alike; a graph with no coordinates
         shows <code>x/y</code> greyed out. The document may declare a default
@@ -132,8 +135,10 @@ figcaption{color:var(--muted);font-size:12.5px;margin-top:6px}
     <li><b>nodes, by kind</b> — every kind with its count and an eye. The eye removes that kind
         from the drawing; anything folded under it is promoted to the top layer rather than
         vanishing with it.</li>
-    <li><b>only categories</b> — folds the whole map until only the top-level kinds remain. Press
-        it again (it becomes <b>unfold</b>) to bring everything back.</li>
+    <li><b>only categories</b> — folds the whole map until only the top-level kinds remain; the
+        button then reads <b>all nodes</b> and brings everything back. The fold is a way of reading,
+        not a lock: click one category and its panel offers <b>unfold — bring back N nodes</b>,
+        which opens that branch one layer while the rest of the map stays folded.</li>
     <li><b>relations</b> — each relation word with a sample of the real line. The eye hides that
         relation; the count is how many edges of it the document carries.</li>
   </ul>
