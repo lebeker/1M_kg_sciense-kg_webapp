@@ -244,6 +244,34 @@ export function ensurePositions(kg: Kg): 'authored' | 'rings' | 'computed' {
   return 'computed'
 }
 
+/**
+ * Which placement the document actually carries: some coordinates everywhere, or none.
+ * A half-placed graph is a `force` graph — the missing dots have to come from somewhere.
+ */
+export function hasAuthored(kg: Kg): boolean {
+  let given = 0
+  kg.graph.forEachNode((_id, a) => {
+    if (typeof a.ax === 'number' && typeof a.ay === 'number') given += 1
+  })
+  return kg.graph.order > 0 && given === kg.graph.order
+}
+
+/**
+ * Switch placement at runtime, because it is the reader's call: `xy` puts every node back where
+ * the document said, `force` lays the graph out from its edges. 2D and 3D both read this.
+ */
+export function relayout(kg: Kg, mode: 'xy' | 'force'): void {
+  if (mode === 'xy') {
+    kg.graph.forEachNode((id, a) => {
+      if (typeof a.ax === 'number' && typeof a.ay === 'number') {
+        kg.graph.mergeNodeAttributes(id, { x: a.ax, y: a.ay })
+      }
+    })
+    return
+  }
+  layoutForce(kg.graph, true)
+}
+
 /** The force pass, with the deterministic start that makes the same document look the same twice. */
 function layoutForce(g: Graph, ignoreGiven: boolean): void {
   const n = g.order
@@ -444,6 +472,10 @@ export function toKg(doc: KgJson): Kg {
     const x = num(n.x), y = num(n.y), size = num(n.size), level = num(n.level)
     if (x !== undefined) attrs.x = x
     if (y !== undefined) attrs.y = y
+    // The document's own placement, kept under its own name: a layout switch has to be able to
+    // put the graph back the way it arrived, and `x`/`y` are where the viewer works.
+    if (x !== undefined) attrs.ax = x
+    if (y !== undefined) attrs.ay = y
     if (size !== undefined) attrs.size = size
     if (level !== undefined) attrs.level = level
 

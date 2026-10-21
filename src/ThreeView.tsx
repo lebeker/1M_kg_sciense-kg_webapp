@@ -27,6 +27,9 @@ type ThreeApi = {
   Mesh: new (geo: unknown, mat: unknown) => ThreeMesh
   SphereGeometry: new (r: number, a: number, b: number) => unknown
   MeshBasicMaterial: new (o: Record<string, unknown>) => unknown
+  CanvasTexture: new (c: HTMLCanvasElement) => { anisotropy: number }
+  Sprite: new (m: unknown) => { position: { set: (x: number, y: number, z: number) => void }; scale: { set: (x: number, y: number, z: number) => void } }
+  SpriteMaterial: new (o: Record<string, unknown>) => unknown
 }
 
 type Props = {
@@ -49,6 +52,9 @@ type Props = {
   theme?: 'dark' | 'light'
   /** In 3D a name is a tooltip either way; `off` is the only state that changes anything. */
   labels?: 'on' | 'hover' | 'off'
+  /** `xy` holds the document's placement (3D shows the 2D picture); `force` lets the simulation
+   *  choose. The same switch the 2D view reads. */
+  layout?: 'xy' | 'force'
   /** Multiplies every relation's width. The graph decides. */
   edgeScale?: number
 }
@@ -70,6 +76,7 @@ export default function ThreeView({
   edgeScale = 1,
   theme = 'dark',
   labels = 'hover',
+  layout = 'force',
 }: Props) {
   const host = useRef<HTMLDivElement | null>(null)
   const inst = useRef<Fg | null>(null)
@@ -97,11 +104,48 @@ export default function ThreeView({
       .then(([mod, threeMod]) => {
         if (dead) return
         const THREE = threeMod as unknown as ThreeApi
+/** A name, drawn once into a canvas and hung above the node as a sprite. */
+const labelSprite = (text: string, color: string, dark: boolean) => {
+  const dpr = 2
+  const font = 26
+  const pad = 6
+  const measure = document.createElement('canvas').getContext('2d')
+  if (measure) measure.font = `${font}px ui-sans-serif, system-ui, sans-serif`
+  const width = Math.ceil(measure ? measure.measureText(text).width : text.length * font * 0.55) + pad * 2
+  const height = font + pad * 2
+  const canvas = document.createElement('canvas')
+  canvas.width = width * dpr
+  canvas.height = height * dpr
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    ctx.scale(dpr, dpr)
+    ctx.font = `${font}px ui-sans-serif, system-ui, sans-serif`
+    ctx.fillStyle = dark ? 'rgba(20, 22, 26, 0.62)' : 'rgba(250, 250, 248, 0.82)'
+    ctx.beginPath()
+    ctx.roundRect(0, 0, width, height, 8)
+    ctx.fill()
+    ctx.fillStyle = color
+    ctx.textBaseline = 'middle'
+    ctx.fillText(text, pad, height / 2)
+  }
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.anisotropy = 2
+  const sprite = new THREE.Sprite(
+    // No attenuation: the name keeps the size it has in 2D, whatever the camera does. A label
+    // that shrinks with distance is a label you cannot read at the zoom you actually use.
+    new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, sizeAttenuation: false }),
+  )
+  // Unattenuated sprites are sized as a fraction of the viewport, not in graph units.
+  const scale = 0.021
+  sprite.scale.set((width / height) * scale, scale, 1)
+  return sprite
+}
+
         const ForceGraph3D = mod.default as unknown as (opts?: Record<string, unknown>) => (el: HTMLElement) => Fg
         const g = ForceGraph3D()(el)
         // Fresh objects, kept in a ref: the engine writes x/y/z back onto them in place, and
         // that is how "fly to this node" finds where it ended up.
-        const fresh = toForceGraph(kg, hidden, muted)
+        const fresh = toForceGraph(kg, hidden, muted, 60, layout === 'xy')
         data.current = fresh
         clouds.current = []
 
@@ -111,10 +155,21 @@ export default function ThreeView({
          * — each at its own radius and level, so the cloud reads as a place rather than a sticker.
          */
         const cloud = (node: ForceNode) => {
-          if (!halosOnRef.current) return undefined
-          const kinds = halosRef.current.get(node.id ?? '')
-          if (!kinds?.length) return undefined
+          const kinds = halosOnRef.current ? halosRef.current.get(node.id ?? '') : undefined
+          // `labels: on` names the nodes here too: a 2D map with names and a 3D map without is
+          // two different readings of the same document.
+          if (labels !== 'on' && !kinds?.length) return undefined
           const group = new THREE.Group()
+          if (labels === 'on') {
+            const sprite = labelSprite(
+              node.label ?? node.id ?? '',
+              theme === 'light' ? '#1b1f27' : '#e6e8ec',
+              theme !== 'light',
+            )
+            sprite.position.set(0, Math.max(4, Number(node.size) || 4) + 6, 0)
+            group.add(sprite)
+          }
+          if (!kinds?.length) return group
           kinds.forEach((h, i) => {
             const r = 7 + i * 3.5 + Math.min(10, Math.sqrt(Math.max(0, h.mass)) * 1.6)
             group.add(
@@ -194,9 +249,52 @@ export default function ThreeView({
           })
         })
         set(g, 'onNodeClick', (n: ForceNode) => selectRef.current(n.id ?? null))
-        set(g, 'onEngineStop', () => set(g, 'zoomToFit', undefined))
+        set(g, 'onEngineStop', () => {
+          // In x/y mode the camera is framed by hand below; letting the library fit a graph whose
+          // positions have not been applied yet puts the camera inside the first node.
+          if (layout !== 'xy') set(g, 'zoomToFit', undefined)
+        })
+        // Held in place, the simulation has nothing to do: stop it after the first frame, so the
+        // picture stays the document's and the camera can go straight to it.
+        set(g, 'cooldownTicks', layout === 'xy' ? 0 : Infinity)
         set(g, 'graphData', fresh)
+        if (layout === 'xy') {
+          // No simulation means no `onEngineStop`, so nothing would frame the picture: put the
+          // camera in front of the plane at the distance the graph is wide, which is how 2D
+          // draws it. Two frames in, because the renderer applies positions on its first pass
+          // and a camera placed before that is a camera placed at the origin.
+          const xs = fresh.nodes.map((n) => n.x ?? 0)
+          const ys = fresh.nodes.map((n) => n.y ?? 0)
+          const cx = (Math.min(...xs) + Math.max(...xs)) / 2
+          const cy = (Math.min(...ys) + Math.max(...ys)) / 2
+          const span = Math.max(
+            Math.max(...xs) - Math.min(...xs),
+            Math.max(...ys) - Math.min(...ys),
+            80,
+          )
+          const place = () => {
+            ;(g as unknown as {
+              cameraPosition: (
+                p: { x: number; y: number; z: number },
+                look?: { x: number; y: number; z: number },
+                ms?: number,
+              ) => void
+            }).cameraPosition({ x: cx, y: cy, z: span * 1.25 }, { x: cx, y: cy, z: 0 }, 0)
+          }
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              // In front of the plane first, then let the library measure what is actually on
+              // screen: a hand-computed distance guesses at the camera's field of view and the
+              // canvas aspect, and guesses wrong on a wide window.
+              place()
+              window.setTimeout(() => set(g, 'zoomToFit', undefined), 60)
+            }),
+          )
+        }
         inst.current = g
+        // Debug handle, the same deal as `__sigma__`: a viewer that cannot be inspected cannot be
+        // tested from the outside.
+        ;(window as unknown as { __kgThree?: unknown }).__kgThree = g
 
         // 3d-force-graph measures itself when it is told to, once — and at mount this element has
         // not been laid out yet, so it starts at zero size and draws nothing. The same observer
@@ -225,7 +323,7 @@ export default function ThreeView({
       data.current = null
       clouds.current = []
     }
-  }, [kg, hidden, halos, halosOn, muted, arrows, edgeScale, theme, labels])
+  }, [kg, hidden, halos, halosOn, muted, arrows, edgeScale, theme, labels, layout])
 
   // Follow a connection in 3D: park the camera along the line from the origin to the node, the
   // standard way to look at one thing without losing where it is.

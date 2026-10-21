@@ -5,6 +5,7 @@ import {
   edgeDash,
   edgePx,
   edgeShape,
+  hasAuthored,
   kindColor,
   kindsOf,
   loadDocs,
@@ -12,6 +13,7 @@ import {
   mutedOf,
   relationOf,
   relationsOf,
+  relayout,
   weightOf,
 } from './kg'
 import { type Absorbed, foldState } from './fold'
@@ -340,6 +342,9 @@ export default function App() {
   /** Nothing is drawn yet: say so, rather than show an empty rectangle. */
   const [painted, setPainted] = useState(false)
   const [legendOpen, setLegendOpen] = useState(true)
+  /** Where the dots come from — the reader's call, with the document's `meta.layout` as the
+   *  opening position. 2D and 3D read the same switch, so the two views can be the same picture. */
+  const [layoutChoice, setLayoutChoice] = useState<'xy' | 'force' | null>(null)
   const [connOpen, setConnOpen] = useState(false)
   /** Labels: on, under the pointer, or off. A small curated map wants names; a thousand-node
    *  field map wants none until asked. The default reads the size of the document, and the
@@ -352,14 +357,15 @@ export default function App() {
       return null
     }
   })
+  // Names at rest only when the document asks for them: on a packed map — 35 nodes placed by
+  // hand, 81 by a layout — every label overlaps its neighbours, and the picture the labels were
+  // meant to explain disappears. `hover` is the default; `meta.visuals.labels: on` opts in.
   const declaredLabels = kg?.meta?.visuals?.labels
   const labels: LabelMode =
     labelChoice ??
     (declaredLabels === 'on' || declaredLabels === 'hover' || declaredLabels === 'off'
       ? (declaredLabels as LabelMode)
-      : (kg?.graph.order ?? 0) <= 50
-        ? 'on'
-        : 'hover')
+      : 'hover')
   const setLabels = useCallback((m: LabelMode) => {
     setLabelChoice(m)
     try {
@@ -368,6 +374,18 @@ export default function App() {
       /* private mode: the page still works, it just forgets */
     }
   }, [])
+  const authored = useMemo(() => (kg ? hasAuthored(kg) : false), [kg])
+  const layout: 'xy' | 'force' =
+    layoutChoice ?? (kg?.meta?.layout === 'force' || !authored ? 'force' : 'xy')
+  const setLayout = useCallback(
+    (m: 'xy' | 'force') => {
+      setLayoutChoice(m)
+      if (!kg) return
+      relayout(kg, m)
+      setGraphVersion((v) => v + 1)
+    },
+    [kg],
+  )
   const arrowsOn = kg?.meta?.visuals?.arrows ?? false
   const edgeScale = kg?.meta?.visuals?.edge_width ?? 1
   /** The reader decided to draw it all, knowing what it costs. */
@@ -820,6 +838,29 @@ export default function App() {
           {theme === 'dark' ? '☀' : '☾'}
         </button>
         <button onClick={() => setFit((n) => n + 1)}>fit</button>
+        <span className="layout" role="group" aria-label="layout">
+          <button
+            className={layout === 'xy' ? 'on' : ''}
+            data-layout-opt="xy"
+            disabled={!authored}
+            title={
+              authored
+                ? 'keep the coordinates the document carries'
+                : 'this graph carries no coordinates to keep'
+            }
+            onClick={() => setLayout('xy')}
+          >
+            x/y
+          </button>
+          <button
+            className={layout === 'force' ? 'on' : ''}
+            data-layout-opt="force"
+            title="ignore the coordinates and lay the graph out from its edges"
+            onClick={() => setLayout('force')}
+          >
+            force
+          </button>
+        </span>
         <div className="switch">
           <button className={mode === '2d' ? 'on' : ''} onClick={() => setMode('2d')}>
             2D
@@ -930,6 +971,7 @@ export default function App() {
               edgeScale={kg.meta?.visuals?.edge_width ?? 1}
               theme={theme}
               labels={labels}
+              layout={layout}
             />
           </Suspense>
         )}

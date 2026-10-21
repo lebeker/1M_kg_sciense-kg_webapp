@@ -714,3 +714,40 @@ button.tiny:hover, button.link:hover { color: var(--accent-soft); }
 .panel h3 .link:hover {
   color: var(--fg);
 }
+
+/* x/y or force: a two-position switch, the same shape as 2D/3D, because it is the same kind of
+   decision — how the picture is made, not what is in it. */
+.layout {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.layout button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 7px;
+  cursor: pointer;
+}
+
+.layout button + button {
+  border-left: 1px solid var(--line);
+}
+
+.layout button:hover {
+  color: var(--fg);
+}
+
+.layout button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.layout button.on {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--fg);
+}

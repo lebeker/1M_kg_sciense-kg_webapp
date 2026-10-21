@@ -14,6 +14,10 @@ export type ForceNode = {
   x?: number
   y?: number
   z?: number
+  /** Fixed position: when set, the simulation may not move the node. */
+  fx?: number
+  fy?: number
+  fz?: number
 }
 
 export type ForceLink = {
@@ -48,6 +52,10 @@ export function toForceGraph(
   hidden?: Set<string>,
   muted?: Set<string>,
   zScale = 60,
+  /** Hold every node where the document put it: the 3D view becomes the 2D picture, with `level`
+   *  as depth. Without this the simulation is free to rearrange the graph, which is why the two
+   *  views used to look like two different maps. */
+  pin = false,
 ): ForceGraphData {
   const nodes: ForceNode[] = []
   const skip = hidden ?? new Set<string>()
@@ -63,6 +71,11 @@ export function toForceGraph(
     }
     if (typeof a.x === 'number') node.x = a.x
     if (typeof a.y === 'number') node.y = a.y
+    if (pin && typeof node.x === 'number' && typeof node.y === 'number') {
+      node.fx = node.x
+      node.fy = node.y
+      node.fz = node.z
+    }
     nodes.push(node)
   })
 
