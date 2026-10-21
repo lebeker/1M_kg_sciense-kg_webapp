@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to read a kg page — every control, and what folding does</title>
+<meta name="description" content="A walk through the viewer: the top bar, the legend, folding, the right-hand panel, notes and limits — with a live map to try it on.">
+<style>
+:root{
+  --bg:#14161a; --fg:#e6e8ec; --muted:#8b93a1; --line:#2a2e36; --panel:#1b1e24;
+  --surface-2:#1d2127; --text-2:#c7ccd6; --text-3:#93a0b4; --accent:#9dc0ff;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);
+  font:15px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+.wrap{max-width:980px;margin:0 auto;padding:40px 24px 80px}
+.kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:32px;line-height:1.15;margin:10px 0 10px;letter-spacing:-.01em}
+h2{font-size:19px;margin:44px 0 6px;letter-spacing:-.005em}
+h2 .n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--muted);
+  font-size:12px;margin-right:9px;vertical-align:2px}
+h3{font-size:14px;margin:20px 0 4px;color:var(--text-2)}
+.lede{color:var(--text-2);max-width:70ch}
+.where{font-size:12.5px;color:var(--muted);margin:2px 0 10px}
+ul{margin:6px 0 0;padding-left:20px;color:var(--text-2)}
+li{margin:5px 0}
+li b{color:var(--fg);font-weight:600}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
+  background:#1b1e24;border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+kbd{font:12px ui-monospace,Menlo,monospace;border:1px solid var(--line);border-bottom-width:2px;
+  border-radius:5px;padding:1px 6px;background:var(--surface-2);color:var(--text-2)}
+.frame{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:18px 0 6px}
+.frame iframe{display:block;width:100%;height:520px;border:0;background:var(--bg)}
+.try{display:inline-block;border:1px solid #3a5a8f;background:#1b2942;color:var(--accent);
+  border-radius:8px;padding:6px 11px;font-size:13px;margin:8px 0 0}
+.try:hover{text-decoration:none;border-color:#4b6fae}
+.note{border-left:2px solid var(--line);padding:2px 0 2px 14px;color:var(--text-3);
+  font-size:13.5px;margin:14px 0}
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.schematic{width:100%;height:auto;margin:18px 0 0;border:1px solid var(--line);border-radius:12px;background:#0f1216}
+.foot{border-top:1px solid var(--line);margin-top:60px;padding-top:16px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="kicker">sciense-kg · how to read a page</div>
+  <h1>One document, one page, and what every control does</h1>
+  <p class="lede">A rendered graph is a file, not a service: everything below works with the page
+  open from disk or over a URL. This is a walk through the actual page — the same one the case
+  page embeds — so read a section, then try it.</p>
+
+  <div class="frame">
+    <iframe src="../lynkuet/index.html" title="the Lynkuet map, live"></iframe>
+  </div>
+
+  <svg class="schematic" viewBox="0 0 980 300" role="img" aria-label="The page in four regions: a top bar, a legend on the left, the canvas in the middle, the node panel on the right">
+    <rect x="1" y="1" width="978" height="44" rx="8" fill="#1b1e24" stroke="#2a2e36"/>
+    <text x="20" y="27" fill="#c7ccd6" font-size="12.5">the top bar</text>
+
+    <rect x="1" y="56" width="250" height="240" rx="8" fill="#1b1e24" stroke="#2a2e36"/>
+    <text x="20" y="82" fill="#c7ccd6" font-size="12.5">the legend</text>
+    <text x="20" y="102" fill="#8b93a1" font-size="11.5">labels · kinds · relations</text>
+
+    <rect x="262" y="56" width="450" height="240" rx="8" fill="#0f1216" stroke="#2a2e36"/>
+    <text x="281" y="82" fill="#c7ccd6" font-size="12.5">the canvas</text>
+    <text x="281" y="102" fill="#8b93a1" font-size="11.5">hover · click · drag · scroll</text>
+
+    <rect x="723" y="56" width="256" height="240" rx="8" fill="#1b1e24" stroke="#2a2e36"/>
+    <text x="742" y="82" fill="#c7ccd6" font-size="12.5">the node panel</text>
+    <text x="742" y="102" fill="#8b93a1" font-size="11.5">props · fold · connections</text>
+  </svg>
+  <p class="where">Where things are: the bar across the top, the legend on the left, the canvas in
+  the middle, the panel on the right. The numbered sections below follow that order.</p>
+
+  <h2><span class="n">1</span>The top bar</h2>
+  <p class="where">Left to right, above everything.</p>
+  <ul>
+    <li><b>title · nodes · edges</b> — what the document is, and how big it is.</li>
+    <li><b>search</b> — two or more characters, matched against label, id and kind. Up to eight
+        hits; picking one selects that node, unfolds it if it was folded away, and puts it in
+        the middle.</li>
+    <li><b>rings</b> (the orbit icon) — draws what a node is hiding inside it as a cloud of small
+        dots around it, one colour per kind. Off by default in the sense that a node with nothing
+        inside shows nothing either way; the switch matters once you fold.</li>
+    <li><b>notes</b> — opens the Markdown notes that travel with the graph, inside the page.</li>
+    <li><b>☀ / ☾</b> — light or dark. A device preference, remembered in this browser.</li>
+    <li><b>fit</b> — frame the whole graph again after you have dragged it off-screen.</li>
+    <li><b>x/y · force</b> — where positions come from: the coordinates the document carries, or a
+        layout computed from the edges. It governs 2D and 3D alike; a graph with no coordinates
+        shows <code>x/y</code> greyed out. The document may declare a default
+        (<code>meta.layout</code>); this switch overrules it for the reading.</li>
+    <li><b>2D / 3D</b> — the same document, drawn flat or in space. In <code>x/y</code> the 3D view
+        holds every node where the document put it and uses <code>level</code> as depth, so the two
+        views are one picture from two angles.</li>
+  </ul>
+
+  <h2><span class="n">2</span>The legend</h2>
+  <p class="where">Left column. <b>▴</b> folds it into one line: <code>▸ NODES 35 · EDGES 73 · labels</code>.</p>
+  <ul>
+    <li><b>labels on / hover / off</b> — names always, names on hover only, or no names. Default is
+        hover: on a packed map, names at rest overlap each other and hide the picture they explain.
+        A document can ask for <code>on</code>.</li>
+    <li><b>nodes, by kind</b> — every kind with its count and an eye. The eye removes that kind
+        from the drawing; anything that was folded under it is promoted to the top layer rather
+        than vanishing with it.</li>
+    <li><b>only categories</b> — folds the whole map until only the top-level kinds remain. Press
+        it again (it becomes <b>unfold</b>) to bring everything back.</li>
+    <li><b>relations</b> — each relation word with a sample of the real line: colour, solid or
+        dashed, with or without a head, and its width. The eye hides that relation; the count is
+        how many edges of it the document carries.</li>
+  </ul>
+
+  <h2><span class="n">3</span>The canvas</h2>
+  <p class="where">The middle. Nothing here is a menu; everything responds to the pointer.</p>
+  <ul>
+    <li><b>hover</b> a node — its name appears beside it (2D) or above it (3D).</li>
+    <li><b>click</b> a node — selects it, opens the right-hand panel and, in 3D, flies to it.</li>
+    <li><b>drag</b> — pan. <b>scroll</b> — zoom. In 3D: left drag orbits, right drag pans,
+        wheel zooms.</li>
+    <li><b>click empty space</b> — closes the panel.</li>
+  </ul>
+
+  <h2><span class="n">4</span>Folding — the point of the whole thing</h2>
+  <p class="where">Select a node; the controls appear in the right-hand panel.</p>
+  <p class="lede">A map of two thousand papers is unreadable at once, and a static summary throws
+  the papers away. Folding keeps both: a node can absorb what sits below it, and say how much it
+  is holding.</p>
+  <ul>
+    <li><b>fold</b> — puts away <i>one</i> layer below the selected node, and the row says what it
+        is about to move (<code>put away 3 publications</code>). Press again for the next layer.
+        There is no button when there is nothing below.</li>
+    <li><b>unfold</b> — brings back exactly what was folded here, one layer per press. It appears
+        only when something is actually folded.</li>
+    <li><b>what a fold does to edges</b> — a connection that ran through the folded node becomes a
+        connection between the nodes on either side, at <b>half power</b>. Nothing is invented: a
+        relation between two nodes that were never connected does not appear.</li>
+    <li><b>a node that is holding something</b> wears a ring whose thickness is the mass inside;
+        with <b>rings</b> on, the contents are also drawn as a cloud of dots in their kind colours.</li>
+    <li><b>clicking a folded node</b> tells you what is inside it, by kind and count — a folded
+        map that does not say what it hides is lying about the map.</li>
+  </ul>
+
+  <h2><span class="n">5</span>The node panel</h2>
+  <p class="where">Right column, after a click.</p>
+  <ul>
+    <li><b>props</b> — the fields the document actually carries: description, link, weight, size…
+        Bookkeeping fields are kept out of the way.</li>
+    <li><b>connections</b> — folded shut by default. Open it for the neighbours grouped by
+        relation; each one is a link that puts that node in the middle.</li>
+    <li><b>cited / cites</b> — for a publication: how often it is cited in total (and by which
+        source), how many of those citing works are in this map, and the same count the other
+        way. The <i>total</i> is stored; the <i>here</i> number is computed from the edges drawn.</li>
+    <li><b>read the note</b> — if that node has a Markdown note beside the graph, open it without
+        leaving the page.</li>
+  </ul>
+
+  <h2><span class="n">6</span>Notes, and handing the page over</h2>
+  <p class="where">Top bar → <b>notes</b>.</p>
+  <ul>
+    <li>The article that was written with the graph, rendered in place. <b>copy</b> and
+        <b>download</b> give you the Markdown; <b>hand it to the agent</b> puts the path back in
+        the conversation that made it.</li>
+    <li>The page is one file: the whole document is inlined, so it opens over <code>file://</code>
+        with no server and no network. Send the HTML, or send the JSON and re-render.</li>
+  </ul>
+
+  <h2><span class="n">7</span>When a document asks for more than a page can draw</h2>
+  <p class="where">A banner appears above the canvas; nothing is deleted.</p>
+  <ul>
+    <li>The banner says what the document asks for and what is being drawn
+        (<code>1,200 nodes · 8,000 edges — this graph asks for 1,200 / 8,000</code>).</li>
+    <li>The page starts with the smallest clusters collapsed, each carrying a ring.</li>
+    <li><b>draw everything</b> takes two clicks — the first one says what it is about to do.</li>
+  </ul>
+
+  <div class="note">Two things this page deliberately does not do: it never edits the document
+  (folding is a way of reading, not a change to the file), and it never talks to a server — so a
+  page you saved last year still opens, whatever has happened since.</div>
+
+  <p><a class="try" href="../lynkuet/index.html">try it on the Lynkuet case →</a>
+     &nbsp;<a href="../">back to the case</a></p>
+
+  <div class="foot">
+    sciense-kg · <a href="../lynkuet/index.html">the case</a> ·
+    <a href="https://github.com/lebeker/1M_kg_sciense-kg_webapp">the viewer</a> ·
+    <a href="https://github.com/lebeker/1M_kg_skill">the skill</a>
+  </div>
+</div>
+</body>
+</html>

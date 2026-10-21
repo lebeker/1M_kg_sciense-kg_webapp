@@ -25,6 +25,8 @@ h2{font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted
 .lede{color:var(--text-2);max-width:64ch;margin:0 0 8px}
 .ask{border-left:2px solid var(--line);padding:2px 0 2px 16px;color:var(--text-2);
   font-style:italic;max-width:66ch;margin:18px 0 0}
+.prompt{margin:12px 0 10px;padding:14px 16px;background:#1b1e24;border:1px solid var(--line);
+  border-radius:10px;color:var(--text-2);font-size:13.5px;white-space:pre-wrap;max-width:78ch}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .stat{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
 .stat b{display:block;font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
@@ -59,8 +61,22 @@ ul.tight li{margin:4px 0}
   by the <code>viewer</code> app. The article is the prop; the map is what the skill made of it;
   the <code>kg.json</code> is the document both came from. Nothing on this page was placed by hand.</p>
 
-  <div class="ask">“An overview of approved drugs — what is approved, for what, by whom, on what
-  evidence — not a graph of a research field.”</div>
+  <h2>The ask</h2>
+  <blockquote class="prompt">I'm Lilly, a new intern at Bayer
+need to write an overview article for "Lynkuet"
+
+• Approval Date: October 24, 2025
+• Therapeutic Class / Mechanism: Dual neurokinin-1 and 3 (NK1,3) receptor antagonist.
+• It is a newly introduced non-hormonal treatment for moderate-to-severe vasomotor symptoms (hot flashes) due to menopause. It enters a rapidly evolving class alongside Fezolinetant (Veozah, approved mid-2023). A unified class overview explicitly comparing these specific neurokinin antagonists has very little published material yet.
+• You should  test on whether it can co-cluster Elinzanetant and Fezolinetant together into a "Neurokinin Antagonist" class map, even though Elinzanetant itself has a very short paper trail.</blockquote>
+  <p class="muted" style="font-size:13.5px">Sent with two attachments: the working folder, and a
+  40-line method note — <a href="lynkuet/brief.md">brief.md</a> — naming the OASIS trials to seed
+  from, three prongs to traverse (parallel class, upstream science, post-market), and three
+  outputs: a timeline, a clustered map, a gap report. <a href="lynkuet/prompt.md">prompt.md</a>
+  keeps both pieces of text together.</p>
+  <p class="muted" style="font-size:13.5px">Made by <b>Hermes Agent</b> (desktop) on
+  <code>deepseek-v4.1-flash:cloud</code>, one session on 20 October 2026, 28 minutes — 24 OpenAlex
+  calls, about $0.012 at list price.</p>
 
   <h2>The result</h2>
   <div class="grid">
@@ -82,10 +98,13 @@ ul.tight li{margin:4px 0}
     <a class="btn" href="lynkuet/timeline.html">the same case as a timeline</a>
     <a class="btn" href="lynkuet/overview.md">read the article (.md)</a>
     <a class="btn" href="lynkuet/graph.json" download>download kg.json</a>
+    <a class="btn" href="how-to/">what every button does</a>
   </div>
   <p class="muted" style="font-size:13px;margin-top:10px">In the map: <b>notes</b> shows the
   article inside the page, <b>x/y · force</b> chooses between the coordinates the document carries
-  and a layout computed from the edges, and the legend folds relations off one by one.</p>
+  and a layout computed from the edges, and the legend folds relations off one by one. New here?
+  <a href="how-to/">What every button does</a> walks through the page control by control, with a
+  live map to try it on.</p>
 
   <h2>What the document carries</h2>
   <table>
