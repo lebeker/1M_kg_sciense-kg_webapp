@@ -18,7 +18,7 @@ a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
 .wrap{max-width:980px;margin:0 auto;padding:40px 24px 80px}
 .kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 h1{font-size:32px;line-height:1.15;margin:10px 0 10px;letter-spacing:-.01em}
-h2{font-size:19px;margin:44px 0 6px;letter-spacing:-.005em}
+h2{font-size:19px;margin:46px 0 6px;letter-spacing:-.005em}
 h2 .n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;
   background:var(--surface-2);border:1px solid var(--line);color:var(--muted);
   font-size:12px;margin-right:9px;vertical-align:2px}
@@ -26,12 +26,10 @@ h3{font-size:14px;margin:20px 0 4px;color:var(--text-2)}
 .lede{color:var(--text-2);max-width:70ch}
 .where{font-size:12.5px;color:var(--muted);margin:2px 0 10px}
 ul{margin:6px 0 0;padding-left:20px;color:var(--text-2)}
-li{margin:5px 0}
+li{margin:7px 0}
 li b{color:var(--fg);font-weight:600}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
   background:#1b1e24;border:1px solid var(--line);border-radius:5px;padding:1px 5px}
-kbd{font:12px ui-monospace,Menlo,monospace;border:1px solid var(--line);border-bottom-width:2px;
-  border-radius:5px;padding:1px 6px;background:var(--surface-2);color:var(--text-2)}
 .frame{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:18px 0 6px}
 .frame iframe{display:block;width:100%;height:520px;border:0;background:var(--bg)}
 .try{display:inline-block;border:1px solid #3a5a8f;background:#1b2942;color:var(--accent);
@@ -39,11 +37,18 @@ kbd{font:12px ui-monospace,Menlo,monospace;border:1px solid var(--line);border-b
 .try:hover{text-decoration:none;border-color:#4b6fae}
 .note{border-left:2px solid var(--line);padding:2px 0 2px 14px;color:var(--text-3);
   font-size:13.5px;margin:14px 0}
-table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px}
-th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+figure{margin:14px 0 6px}
+figure img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:10px}
+figure.narrow{max-width:340px}
+figcaption{color:var(--muted);font-size:12.5px;margin-top:6px}
 .schematic{width:100%;height:auto;margin:18px 0 0;border:1px solid var(--line);border-radius:12px;background:#0f1216}
 .foot{border-top:1px solid var(--line);margin-top:60px;padding-top:16px;color:var(--muted);font-size:13px}
+.ico{display:inline-flex;vertical-align:-3px;margin-right:6px;color:var(--text-3)}
+.steps{counter-reset:s;list-style:none;padding-left:0}
+.steps li{counter-increment:s;position:relative;padding-left:30px}
+.steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:20px;height:20px;
+  display:grid;place-items:center;border-radius:50%;border:1px solid var(--line);
+  background:var(--surface-2);color:var(--muted);font-size:11.5px}
 </style>
 </head>
 <body>
@@ -79,41 +84,55 @@ th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04
   the middle, the panel on the right. The numbered sections below follow that order.</p>
 
   <h2><span class="n">1</span>The top bar</h2>
-  <p class="where">Left to right, above everything.</p>
+  <p class="where">Two rows: the document names itself, then its controls. The count, the search
+  box and <b>notes</b> sit on the left — the search takes whatever room is left — and every switch
+  sits on the right.</p>
+  <figure>
+    <img src="topbar-left.png" alt="The left half of the real top bar: the title on its own row, then the node and edge count, the wide search field and the notes button">
+    <img src="topbar-right.png" alt="The right half of the real top bar: orbit, theme, fit, x/y-force and 2D/3D" style="margin-top:10px">
+    <figcaption>Two halves of the real bar. Left: count · search · notes. Right: rings · theme ·
+    fit · layout · 2D/3D.</figcaption>
+  </figure>
   <ul>
     <li><b>title · nodes · edges</b> — what the document is, and how big it is.</li>
-    <li><b>search</b> — two or more characters, matched against label, id and kind. Up to eight
-        hits; picking one selects that node, unfolds it if it was folded away, and puts it in
-        the middle.</li>
-    <li><b>rings</b> (the orbit icon) — draws what a node is hiding inside it as a cloud of small
-        dots around it, one colour per kind. Off by default in the sense that a node with nothing
-        inside shows nothing either way; the switch matters once you fold.</li>
-    <li><b>notes</b> — opens the Markdown notes that travel with the graph, inside the page.</li>
+    <li><span class="ico"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m15 15 5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><b>search</b>
+        — two or more characters, matched against label, id and kind. Up to eight hits; picking one
+        selects that node, unfolds it if it was folded away, and puts it in the middle.</li>
+    <li><span class="ico"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="currentColor"/><ellipse cx="12" cy="12" rx="9" ry="4.4" fill="none" stroke="currentColor" stroke-width="1.4" transform="rotate(-24 12 12)"/><circle cx="19.4" cy="8.2" r="1.5" fill="currentColor"/></svg></span><b>rings</b>
+        — draws what a node is hiding inside it as a cloud of small bodies around it, one colour
+        per kind, turning on their own orbit. This is the switch that makes a folded map legible.</li>
+    <li><span class="ico"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M6 3.5h8.2L18 7.3V20a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 20V3.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3.8V8h4.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 12h6M9 15.5h6" stroke="currentColor" stroke-width="1.4"/></svg></span><b>notes</b>
+        — opens the Markdown notes that travel with the graph, inside the page.</li>
     <li><b>☀ / ☾</b> — light or dark. A device preference, remembered in this browser.</li>
-    <li><b>fit</b> — frame the whole graph again after you have dragged it off-screen.</li>
+    <li><span class="ico"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M9 4H4v5M15 4h5v5M15 20h5v-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><b>fit</b>
+        — frame the whole graph again after you have dragged it off-screen.</li>
     <li><b>x/y · force</b> — where positions come from: the coordinates the document carries, or a
         layout computed from the edges. It governs 2D and 3D alike; a graph with no coordinates
         shows <code>x/y</code> greyed out. The document may declare a default
         (<code>meta.layout</code>); this switch overrules it for the reading.</li>
-    <li><b>2D / 3D</b> — the same document, drawn flat or in space. In <code>x/y</code> the 3D view
-        holds every node where the document put it and uses <code>level</code> as depth, so the two
-        views are one picture from two angles.</li>
+    <li><b>2D / 3D</b> — the same document, drawn flat or in space. With <code>x/y</code> the 3D
+        view holds every node where the document put it and uses <code>level</code> as depth, so
+        the two views are one picture from two angles.</li>
   </ul>
 
   <h2><span class="n">2</span>The legend</h2>
   <p class="where">Left column. <b>▴</b> folds it into one line: <code>▸ NODES 35 · EDGES 73 · labels</code>.</p>
+  <figure class="narrow">
+    <img src="legend.png" alt="The legend: a labels switch (on, hover, off), node kinds with counts and eye toggles, then relations, each drawn as a line sample with a count and an eye">
+    <figcaption>Kinds first, then relations — every relation row draws a real line of that
+    relation: its colour, its dashes, its head, its width.</figcaption>
+  </figure>
   <ul>
     <li><b>labels on / hover / off</b> — names always, names on hover only, or no names. Default is
         hover: on a packed map, names at rest overlap each other and hide the picture they explain.
         A document can ask for <code>on</code>.</li>
     <li><b>nodes, by kind</b> — every kind with its count and an eye. The eye removes that kind
-        from the drawing; anything that was folded under it is promoted to the top layer rather
-        than vanishing with it.</li>
+        from the drawing; anything folded under it is promoted to the top layer rather than
+        vanishing with it.</li>
     <li><b>only categories</b> — folds the whole map until only the top-level kinds remain. Press
         it again (it becomes <b>unfold</b>) to bring everything back.</li>
-    <li><b>relations</b> — each relation word with a sample of the real line: colour, solid or
-        dashed, with or without a head, and its width. The eye hides that relation; the count is
-        how many edges of it the document carries.</li>
+    <li><b>relations</b> — each relation word with a sample of the real line. The eye hides that
+        relation; the count is how many edges of it the document carries.</li>
   </ul>
 
   <h2><span class="n">3</span>The canvas</h2>
@@ -129,25 +148,45 @@ th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04
   <h2><span class="n">4</span>Folding — the point of the whole thing</h2>
   <p class="where">Select a node; the controls appear in the right-hand panel.</p>
   <p class="lede">A map of two thousand papers is unreadable at once, and a static summary throws
-  the papers away. Folding keeps both: a node can absorb what sits below it, and say how much it
-  is holding.</p>
+  the papers away. Folding keeps both: a node absorbs what sits below it, and says how much it is
+  holding.</p>
+  <figure>
+    <img src="orbits-3d.png" alt="3D close-up of a folded node: two translucent coloured clouds around it, with small coloured bodies circling inside them">
+    <figcaption>Five nodes instead of thirty-five, in 3D, with rings on. The clouds are the kinds
+    that were folded in; the small bodies circle inside them. This is the view worth opening.</figcaption>
+  </figure>
+  <h3>To see it in ten seconds</h3>
+  <ol class="steps">
+    <li>Press <b>only categories</b> in the legend — the whole map folds to its kinds
+        (35 nodes → 5 on this graph).</li>
+    <li>Press <b>3D</b>, then <b>fit</b> if the picture is off-screen.</li>
+    <li>Click one of the remaining nodes: the camera flies to it, and the clouds around it are the
+        publications and researchers that went inside.</li>
+    <li>To do it by hand instead: click any node with something below it — its panel says
+        <code>fold · put away N nodes</code> — and press <b>fold</b>. One layer per press; press
+        again for the layer below that.</li>
+  </ol>
   <ul>
     <li><b>fold</b> — puts away <i>one</i> layer below the selected node, and the row says what it
-        is about to move (<code>put away 3 publications</code>). Press again for the next layer.
-        There is no button when there is nothing below.</li>
+        is about to move (<code>put away 7 nodes (5 publications, 2 companies)</code>). There is no
+        button when there is nothing below.</li>
     <li><b>unfold</b> — brings back exactly what was folded here, one layer per press. It appears
         only when something is actually folded.</li>
     <li><b>what a fold does to edges</b> — a connection that ran through the folded node becomes a
         connection between the nodes on either side, at <b>half power</b>. Nothing is invented: a
         relation between two nodes that were never connected does not appear.</li>
     <li><b>a node that is holding something</b> wears a ring whose thickness is the mass inside;
-        with <b>rings</b> on, the contents are also drawn as a cloud of dots in their kind colours.</li>
+        with <b>rings</b> on, the contents are drawn as the cloud above.</li>
     <li><b>clicking a folded node</b> tells you what is inside it, by kind and count — a folded
         map that does not say what it hides is lying about the map.</li>
   </ul>
 
   <h2><span class="n">5</span>The node panel</h2>
   <p class="where">Right column, after a click.</p>
+  <figure class="narrow">
+    <img src="panel.png" alt="The node panel: kind and weight, the node's own fields, a fold row reading put away 7 nodes (5 publications, 2 companies), then a collapsed Connections 10 block and the description">
+    <figcaption>A subject node: its own fields, the fold row, and connections folded shut.</figcaption>
+  </figure>
   <ul>
     <li><b>props</b> — the fields the document actually carries: description, link, weight, size…
         Bookkeeping fields are kept out of the way.</li>

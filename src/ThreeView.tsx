@@ -84,6 +84,8 @@ export default function ThreeView({
   const data = useRef<ForceGraphData | null>(null)
   /** Every cloud currently in the scene, so the tick can turn its nodes. */
   const clouds = useRef<{ children: ThreeMesh[] }[]>([])
+  /** The orbit animation's frame handle: the clouds turn whether or not the simulation runs. */
+  const raf = useRef(0)
   /** Whether the engine came up: the element says so, so a test does not have to guess. */
   const [ready, setReady] = useState(false)
   const [drawn, setDrawn] = useState(0)
@@ -237,17 +239,25 @@ const labelSprite = (text: string, color: string, dark: boolean) => {
         set(g, 'linkDirectionalParticleColor', (l: Record<string, unknown>) => (l.color as string) ?? '#8b96a8')
         set(g, 'nodeThreeObject', cloud)
         set(g, 'nodeThreeObjectExtend', true)
-        set(g, 'onEngineTick', () => {
+        // The orbits turn with the clock, not with the simulation. They used to be driven by
+        // `onEngineTick`, which stops the moment the layout settles — and in `x/y` it never
+        // starts at all, so every cloud sat still with its moons buried in the middle.
+        const spin = () => {
+          if (dead) return
           clouds.current.forEach((group) => {
             group.children.forEach((child) => {
               const u = child.userData
               if (!u || typeof u.orbit !== 'number') return
               u.phase += u.speed
-              const mesh = child as unknown as { position: { set: (x: number, y: number, z: number) => void } }
+              const mesh = child as unknown as {
+                position: { set: (x: number, y: number, z: number) => void }
+              }
               mesh.position.set(Math.cos(u.phase) * u.orbit, u.lift, Math.sin(u.phase) * u.orbit)
             })
           })
-        })
+          raf.current = requestAnimationFrame(spin)
+        }
+        raf.current = requestAnimationFrame(spin)
         set(g, 'onNodeClick', (n: ForceNode) => selectRef.current(n.id ?? null))
         set(g, 'onEngineStop', () => {
           // In x/y mode the camera is framed by hand below; letting the library fit a graph whose
@@ -315,6 +325,7 @@ const labelSprite = (text: string, color: string, dark: boolean) => {
 
     return () => {
       dead = true
+      cancelAnimationFrame(raf.current)
       observers.current?.disconnect()
       observers.current = null
       const api = inst.current

@@ -66,10 +66,21 @@ const PANEL_PX = 341
  * loading screen is for: a number measured here, not guessed for a machine it never saw. */
 const CALIBRATE_OVER = 600
 
+/** `company` → `companies`, `institution` → `institutions`: a count is read, not parsed. */
+function plural(word: string, n: number): string {
+  if (n === 1) return word
+  if (/[^aeiou]y$/.test(word)) return `${word.slice(0, -1)}ies`
+  if (/(s|x|z|ch|sh)$/.test(word)) return `${word}es`
+  return `${word}s`
+}
+
 /** The rows the panel lays out in its own order. Everything else a node carries is data. */
 const LAID_OUT = new Set([
   'id', 'label', 'kind', 'level', 'size', 'tags', 'link', 'desc', 'color',
   'style', 'x', 'y', 'doc', 'md', 'desc_rev', 'px',
+  // The coordinates the document was authored with, kept so `x/y` can restore them after a
+  // `force` reading. Bookkeeping, not a property of the node.
+  'ax', 'ay', 'az',
   // Shown in their own row: `cited 300 · 6 here · openalex`.
   'cited_by', 'cited_by_source', 'cited_by_at', 'references', 'references_source',
   // Resolved by the data layer from the edges around the node, and shown in their own rows:
@@ -527,7 +538,7 @@ export default function App() {
     if (!p) return ''
     const parts = [...p.byKind.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([kind, n]) => `${n} ${kind}${n === 1 ? '' : 's'}`)
+      .map(([kind, n]) => `${n} ${plural(kind, n)}`)
     return `${p.n} node${p.n === 1 ? '' : 's'}${parts.length ? ` (${parts.join(', ')})` : ''}`
   }, [])
 
@@ -769,105 +780,149 @@ export default function App() {
       data-halos={halosOn ? 'on' : 'off'}
     >
       <header className="bar">
-        <span className="title">{kg.meta.title ?? 'knowledge graph'}</span>
-        <span className="count">
-          {hidden.size > 0
-            ? `${kg.graph.order - hidden.size} of ${kg.graph.order} nodes drawn · ${docEdges} edges`
-            : `${kg.graph.order} nodes · ${docEdges} edges`}
-          {kg.layout === 'computed'
-            ? ' · layout computed here'
-            : kg.layout === 'rings'
-              ? ' · arranged by ring'
-              : ''}
-        </span>
+        {/* Two rows: the document names itself above, the controls below. One row of everything
+            is what squeezed the title into an ellipsis the moment the window was not wide. */}
+        <div className="titlerow">
+          <span className="title">{kg.meta.title ?? 'knowledge graph'}</span>
+        </div>
+        <div className="controls">
+          <span className="count">
+            {hidden.size > 0
+              ? `${kg.graph.order - hidden.size} of ${kg.graph.order} nodes drawn · ${docEdges} edges`
+              : `${kg.graph.order} nodes · ${docEdges} edges`}
+            {kg.layout === 'computed'
+              ? ' · layout computed here'
+              : kg.layout === 'rings'
+                ? ' · arranged by ring'
+                : ''}
+          </span>
 
-        <input
-          className="search"
-          placeholder="search  /"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setQuery('')
-          }}
-        />
+          <input
+            className="search"
+            placeholder="search  /"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setQuery('')
+            }}
+          />
 
-        <div className="spacer" />
+          {overview ? (
+            <button
+              className="notes"
+              data-notes={overview}
+              onClick={() => setDoc(overview)}
+              title="the notes written beside this graph"
+            >
+              notes
+              {/* a page, once folded */}
+              <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+                <path
+                  d="M6 3.5h8.2L18 7.3V20a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 20V3.5Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+                <path d="M14 3.8V8h4.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M9 12h6M9 15.5h6" stroke="currentColor" strokeWidth="1.4" />
+              </svg>
+            </button>
+          ) : null}
 
-        <button
-          className={`icon${halosOn ? '' : ' off'}`}
-          data-halos-toggle={halosOn ? 'on' : 'off'}
-          aria-pressed={halosOn}
-          title={
-            halosOn
-              ? 'rings: what is folded inside a node is drawn as an orbit around it'
-              : 'rings off: a folded node is just a node'
-          }
-          onClick={() => setHalosOn((v) => !v)}
-        >
-          {/* an orbit: one body, one ring, one moon */}
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <circle cx="12" cy="12" r="3.2" fill="currentColor" />
-            <ellipse
-              cx="12"
-              cy="12"
-              rx="9"
-              ry="4.4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              transform="rotate(-24 12 12)"
-            />
-            <circle cx="19.4" cy="8.2" r="1.5" fill="currentColor" />
-          </svg>
-        </button>
+          <div className="spacer" />
 
-        {overview ? (
-          <button onClick={() => setDoc(overview)} title="the notes written beside this graph">
-            notes
-          </button>
-        ) : null}
-        {foldSteps.size > 0 || hiddenKinds.size > 0 || calHosts.size > 0 || foldAll ? (
-          <button onClick={revealAll}>show all</button>
-        ) : null}
-        <button
-          className="theme"
-          data-theme-toggle={theme}
-          title={theme === 'dark' ? 'switch to daylight' : 'switch to night'}
-          onClick={() => setTheme((v) => (v === 'dark' ? 'light' : 'dark'))}
-        >
-          {theme === 'dark' ? '☀' : '☾'}
-        </button>
-        <button onClick={() => setFit((n) => n + 1)}>fit</button>
-        <span className="layout" role="group" aria-label="layout">
+          {foldSteps.size > 0 || hiddenKinds.size > 0 || calHosts.size > 0 || foldAll ? (
+            <button onClick={revealAll}>show all</button>
+          ) : null}
+
           <button
-            className={layout === 'xy' ? 'on' : ''}
-            data-layout-opt="xy"
-            disabled={!authored}
+            className={`icon${halosOn ? '' : ' off'}`}
+            data-halos-toggle={halosOn ? 'on' : 'off'}
+            aria-pressed={halosOn}
             title={
-              authored
-                ? 'keep the coordinates the document carries'
-                : 'this graph carries no coordinates to keep'
+              halosOn
+                ? 'rings: what is folded inside a node is drawn as an orbit around it'
+                : 'rings off: a folded node is just a node'
             }
-            onClick={() => setLayout('xy')}
+            onClick={() => setHalosOn((v) => !v)}
           >
-            x/y
+            {/* an orbit: one body, one ring, one moon */}
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <circle cx="12" cy="12" r="3.2" fill="currentColor" />
+              <ellipse
+                cx="12"
+                cy="12"
+                rx="9"
+                ry="4.4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                transform="rotate(-24 12 12)"
+              />
+              <circle cx="19.4" cy="8.2" r="1.5" fill="currentColor" />
+            </svg>
           </button>
+
           <button
-            className={layout === 'force' ? 'on' : ''}
-            data-layout-opt="force"
-            title="ignore the coordinates and lay the graph out from its edges"
-            onClick={() => setLayout('force')}
+            className="theme"
+            data-theme-toggle={theme}
+            title={theme === 'dark' ? 'switch to daylight' : 'switch to night'}
+            onClick={() => setTheme((v) => (v === 'dark' ? 'light' : 'dark'))}
           >
-            force
+            {theme === 'dark' ? '☀' : '☾'}
           </button>
-        </span>
-        <div className="switch">
-          <button className={mode === '2d' ? 'on' : ''} onClick={() => setMode('2d')}>
-            2D
+
+          <button
+            className="icon"
+            data-fit
+            title="frame the whole graph"
+            aria-label="fit the graph to the window"
+            onClick={() => setFit((n) => n + 1)}
+          >
+            {/* four corners, closing on the picture */}
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path
+                d="M9 4H4v5M15 4h5v5M15 20h5v-5M9 20H4v-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+              />
+            </svg>
           </button>
-          <button className={mode === '3d' ? 'on' : ''} onClick={() => setMode('3d')}>
-            3D
-          </button>
+
+          <span className="layout" role="group" aria-label="layout">
+            <button
+              className={layout === 'xy' ? 'on' : ''}
+              data-layout-opt="xy"
+              disabled={!authored}
+              title={
+                authored
+                  ? 'keep the coordinates the document carries'
+                  : 'this graph carries no coordinates to keep'
+              }
+              onClick={() => setLayout('xy')}
+            >
+              x/y
+            </button>
+            <button
+              className={layout === 'force' ? 'on' : ''}
+              data-layout-opt="force"
+              title="ignore the coordinates and lay the graph out from its edges"
+              onClick={() => setLayout('force')}
+            >
+              force
+            </button>
+          </span>
+          <div className="switch">
+            <button className={mode === '2d' ? 'on' : ''} onClick={() => setMode('2d')}>
+              2D
+            </button>
+            <button className={mode === '3d' ? 'on' : ''} onClick={() => setMode('3d')}>
+              3D
+            </button>
+          </div>
         </div>
       </header>
 
