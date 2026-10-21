@@ -117,9 +117,11 @@ figcaption{color:var(--muted);font-size:12.5px;margin-top:6px}
   </ul>
 
   <h2><span class="n">2</span>The legend</h2>
-  <p class="where">Left column. <b>▴</b> folds it into one line: <code>▸ NODES 35 · EDGES 73 · labels</code>.</p>
+  <p class="where">Left column. The chevron button in its header — <b>▾</b> while the legend is open —
+     folds it into one line, where the same button points <b>▸</b> and opens it again:
+     <code>▸ NODES 35 · EDGES 73 · labels</code>.</p>
   <figure class="narrow">
-    <img src="legend.png" alt="The legend: a labels switch (on, hover, off), node kinds with counts and eye toggles, then relations, each drawn as a line sample with a count and an eye">
+    <img src="legend.png" width="255" alt="The legend: a boxed down-chevron button in the header, a labels switch (on, hover, off), node kinds with counts and eye toggles, then relations, each drawn as a line sample with a count and an eye">
     <figcaption>Kinds first, then relations — every relation row draws a real line of that
     relation: its colour, its dashes, its head, its width.</figcaption>
   </figure>
@@ -185,13 +187,14 @@ figcaption{color:var(--muted);font-size:12.5px;margin-top:6px}
   <h2><span class="n">5</span>The node panel</h2>
   <p class="where">Right column, after a click.</p>
   <figure class="narrow">
-    <img src="panel.png" alt="The node panel: kind and weight, the node's own fields, a fold row reading put away 7 nodes (5 publications, 2 companies), then a collapsed Connections 10 block and the description">
+    <img src="panel.png" width="340" alt="The node panel: kind and weight, the node's own fields, a fold row reading put away 3 nodes (3 publications), then an accent-blue Connections 5 row with a boxed right chevron, and the description">
     <figcaption>A subject node: its own fields, the fold row, and connections folded shut.</figcaption>
   </figure>
   <ul>
     <li><b>props</b> — the fields the document actually carries: description, link, weight, size…
         Bookkeeping fields are kept out of the way.</li>
-    <li><b>connections</b> — folded shut by default. Open it for the neighbours grouped by
+    <li><b>connections</b> — folded shut by default, with a <b>▸</b> that turns <b>▾</b> when it
+        opens. Open it for the neighbours grouped by
         relation; each one is a link that puts that node in the middle.</li>
     <li><b>cited / cites</b> — for a publication: how often it is cited in total (and by which
         source), how many of those citing works are in this map, and the same count the other
