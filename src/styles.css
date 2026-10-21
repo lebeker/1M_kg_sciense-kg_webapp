@@ -128,7 +128,10 @@ body {
 }
 
 .spacer {
-  flex: 1;
+  /* A breather between the left group and the switches — not the thing that takes the slack:
+     the search field is. With both growing they split the room evenly and the field stays
+     half-width while a hole opens in the middle of the bar. */
+  flex: 0 0 40px;
 }
 
 .search {
