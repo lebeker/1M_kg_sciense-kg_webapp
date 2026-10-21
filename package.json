@@ -1,7 +1,7 @@
 {
   "name": "kg-viewer",
   "private": true,
-  "version": "0.0.44",
+  "version": "0.0.45",
   "type": "module",
   "description": "Single-file React viewer for a kg/1 knowledge-graph document.",
   "scripts": {
@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "bundle": "node scripts/bundle.mjs",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "test:fold": "bun test src/fold.test.ts"
   },
   "dependencies": {
     "3d-force-graph": "^1.80.1",

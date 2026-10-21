@@ -691,6 +691,13 @@ export default function App() {
     if (overDocLimits) setFoldAll(true)
   }, [kg, overDocLimits])
 
+  // A handle for tests and for anyone reading the page in a console: the same graph the picture
+  // is drawn from, after the fold's virtual edges. It reads; it does not write.
+  useEffect(() => {
+    if (!kg) return
+    ;(window as unknown as { __kg?: unknown }).__kg = kg
+  }, [kg])
+
   /** The edges a fold invents: rebuilt from scratch whenever a decision changes. */
   useEffect(() => {
     if (!kg) return
@@ -715,6 +722,28 @@ export default function App() {
     if (!selected || lastSelected.current === selected) return
     lastSelected.current = selected
     if (!hidden.has(selected)) return
+    if (foldAll) {
+      // The map-wide fold hides it without a step to drop: open the branch that holds it, one
+      // ancestor at a time, and the node the search found is on the map.
+      setOpenBranches((prev) => {
+        if (!kg) return prev
+        const next = new Set(prev)
+        let cur = selected
+        for (let i = 0; i < 24; i += 1) {
+          const level = (id: string) => (kg.graph.getNodeAttribute(id, 'level') as number | undefined) ?? 0
+          const parents = kg.graph
+            .neighbors(cur)
+            .filter((n) => level(n) < level(cur))
+            .sort((a, b) => level(b) - level(a))
+          const parent = parents[0]
+          if (!parent) break
+          next.add(parent)
+          cur = parent
+        }
+        return next
+      })
+      return
+    }
     setFoldSteps(new Map())
     setCalHidden((h) => {
       if (!h.has(selected)) return h
@@ -722,7 +751,7 @@ export default function App() {
       out.delete(selected)
       return out
     })
-  }, [selected, hidden])
+  }, [selected, hidden, foldAll, kg])
 
   // The budget: measured on this host, remembered here, raised by use. A number written into a
   // document would be a guess about a machine it never saw.

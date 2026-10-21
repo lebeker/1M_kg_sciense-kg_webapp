@@ -330,6 +330,62 @@ export function foldState(
     for (let i = 0; i < step.n; i += 1) if (!foldStep(step.id)) break
   }
 
+  // A relation between two things that both went inside a host does not vanish with them: it
+  // becomes a relation between the hosts. Folding must summarise a map, not delete its structure
+  // — fold a map to its categories and two categories that the document had joined would stand
+  // apart as if nothing connected them. This only lifts relations that existed; it never invents
+  // one between strangers.
+  const hostsOfItem = new Map<string, string[]>()
+  absorbed.forEach((a, host) => {
+    a.items.forEach((item) => {
+      const at = hostsOfItem.get(item) ?? []
+      at.push(host)
+      hostsOfItem.set(item, at)
+    })
+  })
+  /** The surviving node a hidden thing ended up inside, following chains of folds. */
+  const survivorOf = (id: string): string[] => {
+    let frontier = [id]
+    for (let hop = 0; hop < 32; hop += 1) {
+      if (!frontier.some((x) => hidden.has(x))) return frontier.filter((x) => !hidden.has(x))
+      const next: string[] = []
+      for (const x of frontier) {
+        if (!hidden.has(x)) next.push(x)
+        else for (const up of hostsOfItem.get(x) ?? []) next.push(up)
+      }
+      frontier = [...new Set(next)]
+      if (!frontier.length) return []
+    }
+    return frontier.filter((x) => !hidden.has(x))
+  }
+  const lifted = new Map<string, { a: string; b: string; power: number; label: string }>()
+  kg.graph.forEachEdge((_key, attrs, s, t) => {
+    const a = attrs as Record<string, unknown>
+    if (a.agg) return
+    const from = survivorOf(s)
+    const to = survivorOf(t)
+    if (!from.length || !to.length) return
+    const label = typeof a.label === 'string' ? a.label : relationOf(a)
+    const power = typeof a.power === 'number' ? a.power : 1
+    const share = power / (from.length * to.length)
+    for (const ha of from) {
+      for (const hb of to) {
+        if (ha === hb) continue
+        if (adj.get(ha)?.has(hb) || peers.get(ha)?.has(hb)) continue
+        const [x, y] = ha < hb ? [ha, hb] : [hb, ha]
+        const key = `${x}|${y}|${label}`
+        // One line per pair and relation, however many edges fed it: a folded map that drew a
+        // line per hidden edge would be a hairball with the same information. The strongest
+        // contributor sets the width, capped so a hundred weak relations do not become a cable.
+        const at = lifted.get(key)
+        const power = Math.min(2, share)
+        if (at) at.power = Math.max(at.power, power)
+        else lifted.set(key, { a: ha, b: hb, power, label })
+      }
+    }
+  })
+  for (const [key, v] of lifted) virtualBy.set(`lift|${key}`, v)
+
   // What two surviving nodes have in common, counted once per shared thing: two categories that
   // share three people are joined by `shares scientist ×3`.
   const hostsOf = new Map<string, Set<string>>()
