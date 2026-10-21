@@ -81,7 +81,20 @@ if (existsSync(appsPath)) {
   const repo = (origin || 'https://github.com/lebeker/1M_kg_sciense-kg_webapp')
     .replace('https://github.com/', 'https://raw.githubusercontent.com/')
   const fresh = `${repo}/viewer-v${pkg.version}/viewer.html`
+  // The declaration travels with the catalogue: what the app requires, what it suggests and
+  // where its skills live. A graph asks `check` what it needs, and `check` reads the catalogue
+  // — so a catalogue that drifted from app.json is a check that answers for an app that no
+  // longer exists.
+  const decl = JSON.parse(readFileSync(join(root, 'app.json'), 'utf8'))
   let touched = 0
+  for (const app of Object.values(apps.apps ?? {})) {
+    if (app?.id !== decl.id) continue
+    for (const k of ['requires', 'recommends', 'tool_notes']) {
+      if (decl[k] !== undefined) app[k] = decl[k]
+    }
+    app.skills_url = `${repo}/main/skills`
+    touched++
+  }
   for (const app of Object.values(apps.apps ?? {})) {
     if (typeof app?.url === 'string' && app.url.includes('/viewer-v')) {
       app.url = fresh
