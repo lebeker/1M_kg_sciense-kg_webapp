@@ -68,6 +68,20 @@ type Props = {
  * 3D view. `3d-force-graph` (and three with it) is imported dynamically, so the bundler puts it
  * in its own chunk and it is only fetched when this component is first rendered.
  */
+/** How wide the picture is, in the document's own units — the yardstick for a node's body. */
+function spanOf(nodes: { x?: number; y?: number }[]): number {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (const n of nodes) {
+    const x = n.x ?? 0, y = n.y ?? 0
+    if (x < minX) minX = x
+    if (x > maxX) maxX = x
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+  }
+  if (!Number.isFinite(minX)) return 1
+  return Math.max(maxX - minX, maxY - minY, 1)
+}
+
 export default function ThreeView({
   kg,
   onSelect,
@@ -231,7 +245,11 @@ const labelSprite = (text: string, color: string, dark: boolean) => {
         set(g, 'width', el.clientWidth)
         set(g, 'height', el.clientHeight)
         set(g, 'backgroundColor', theme === 'light' ? '#f7f8fa' : '#14161a')
-        set(g, 'nodeRelSize', 3)
+        // A node in 3D is a sphere in world units, so a fixed radius is a blob on a small map and
+        // three pixels on a big one: the camera frames the whole picture, and the picture grew.
+        // Keep a node a readable fraction of the map instead — 1 unit of node value per ~0.6% of
+        // the span, with the old 3 as the floor for small documents.
+        set(g, 'nodeRelSize', Math.min(30, Math.max(3, spanOf(fresh.nodes) * 0.006)))
         set(g, 'nodeLabel', (n: ForceNode) => {
           if (labels === 'off') return ''
           const sel = selRef.current
@@ -239,16 +257,15 @@ const labelSprite = (text: string, color: string, dark: boolean) => {
           return n.label ?? n.id ?? ''
         })
         // The same reading as 2D: a selected node keeps its colour and everything else goes
-        // quiet — dimmed, not shrunk, because relative size is the reading.
+        // quiet — dimmed, not shrunk, because relative size is the reading. Dimming is a colour,
+        // never an opacity: a per-node `nodeOpacity` leaves the library's spheres transparent
+        // with no alpha, and a map of invisible spheres is the bug this line used to be.
         const dim = theme === 'light' ? '#cdd3dc' : '#333842'
         set(g, 'nodeColor', (n: ForceNode) => {
           const sel = selRef.current
           if (selHere.current && sel && n.id !== sel) return dim
           return n.color ?? (theme === 'light' ? '#4a7bc4' : '#7b9ecb')
         })
-        set(g, 'nodeOpacity', (n: ForceNode) =>
-          selHere.current && selRef.current && n.id !== selRef.current ? 0.45 : 1,
-        )
         // 3D sizes follow the same claim 2D draws, not the raw number: `px` is the radius the
         // document resolved to, and volume grows as a compressed power of it, so a hub reads as
         // bigger without a small node vanishing next to it.
