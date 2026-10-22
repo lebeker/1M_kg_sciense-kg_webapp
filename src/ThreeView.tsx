@@ -109,6 +109,10 @@ export default function ThreeView({
   const hoverEdgeRef = useRef<string | null>(hoverEdge)
   selRef.current = selected
   hoverEdgeRef.current = hoverEdge
+  /** Is the selected node actually on this map? A selection that is folded away must not dim
+   *  everything: the reader would see a dark picture and no reason for it. */
+  const selHere = useRef(false)
+  selHere.current = !!selected && !!data.current?.nodes.some((n) => n.id === selected)
   /** The link the pointer is over, as the engine reported it. */
   const hoverLinkRef = useRef<string | null>(null)
 
@@ -231,7 +235,7 @@ const labelSprite = (text: string, color: string, dark: boolean) => {
         set(g, 'nodeLabel', (n: ForceNode) => {
           if (labels === 'off') return ''
           const sel = selRef.current
-          if (sel && n.id !== sel) return ''
+          if (selHere.current && sel && n.id !== sel) return ''
           return n.label ?? n.id ?? ''
         })
         // The same reading as 2D: a selected node keeps its colour and everything else goes
@@ -239,10 +243,12 @@ const labelSprite = (text: string, color: string, dark: boolean) => {
         const dim = theme === 'light' ? '#cdd3dc' : '#333842'
         set(g, 'nodeColor', (n: ForceNode) => {
           const sel = selRef.current
-          if (sel && n.id !== sel) return dim
+          if (selHere.current && sel && n.id !== sel) return dim
           return n.color ?? (theme === 'light' ? '#4a7bc4' : '#7b9ecb')
         })
-        set(g, 'nodeOpacity', (n: ForceNode) => (selRef.current && n.id !== selRef.current ? 0.45 : 1))
+        set(g, 'nodeOpacity', (n: ForceNode) =>
+          selHere.current && selRef.current && n.id !== selRef.current ? 0.45 : 1,
+        )
         // 3D sizes follow the same claim 2D draws, not the raw number: `px` is the radius the
         // document resolved to, and volume grows as a compressed power of it, so a hub reads as
         // bigger without a small node vanishing next to it.
@@ -316,6 +322,9 @@ const labelSprite = (text: string, color: string, dark: boolean) => {
         }
         raf.current = requestAnimationFrame(spin)
         set(g, 'onNodeClick', (n: ForceNode) => selectRef.current(n.id ?? null))
+        // Clicking the empty space gives the map back. 2D has done this since its first day; a
+        // view where one click dims everything and nothing undims it is a view you reload.
+        set(g, 'onBackgroundClick', () => selectRef.current(null))
         set(g, 'onEngineStop', () => {
           // In x/y mode the camera is framed by hand below; letting the library fit a graph whose
           // positions have not been applied yet puts the camera inside the first node.
