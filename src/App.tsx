@@ -356,8 +356,11 @@ export default function App() {
   // A number is not a quantity until it says of what — but the panel needs a unit, not the
   // paragraph that defines it. The document keeps the sentence; this keeps its first clause.
   const weightUnit = (() => {
-    const first = weightMetric.split(/\s+[—–-]\s+|(?<=[a-z])\.\s/)[0].trim()
-    return first.length > 56 ? `${first.slice(0, 53)}…` : first
+    // "categories: thousands of works, 2018-2026, whose title carries…" — the unit is the part
+    // before the first comma, once a leading label is out of the way.
+    const raw = weightMetric.replace(/^[^:]{1,24}:\s*/, '')
+    const first = raw.split(/,\s|\s+[—–]\s+|(?<=[a-z])\.\s/)[0].trim()
+    return first.length > 56 ? `${first.slice(0, 53)}…` : first || raw.slice(0, 53)
   })()
 
   /**
