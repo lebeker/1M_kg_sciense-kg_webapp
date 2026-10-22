@@ -57,6 +57,11 @@ type Props = {
   layout?: 'xy' | 'force'
   /** Multiplies every relation's width. The graph decides. */
   edgeScale?: number
+  /** The selected node: in 2D everything else is dimmed, and this view reads the same document
+   *  the same way — a selection that only half the page honours is two readings of one map. */
+  selected?: string | null
+  /** The relation the reader is pointing at in the panel: the same line glow as in 2D. */
+  hoverEdge?: string | null
 }
 
 /**
@@ -77,6 +82,8 @@ export default function ThreeView({
   theme = 'dark',
   labels = 'hover',
   layout = 'force',
+  selected = null,
+  hoverEdge = null,
 }: Props) {
   const host = useRef<HTMLDivElement | null>(null)
   const inst = useRef<Fg | null>(null)
@@ -96,6 +103,14 @@ export default function ThreeView({
   const halosOnRef = useRef<boolean>(true)
   halosRef.current = halos ?? new Map()
   halosOnRef.current = halosOn
+  /** Selection and the pointed relation are read by the painters, not by the effect that builds
+   *  the scene: changing either must repaint, never rebuild. */
+  const selRef = useRef<string | null>(selected)
+  const hoverEdgeRef = useRef<string | null>(hoverEdge)
+  selRef.current = selected
+  hoverEdgeRef.current = hoverEdge
+  /** The link the pointer is over, as the engine reported it. */
+  const hoverLinkRef = useRef<string | null>(null)
 
   useEffect(() => {
     const el = host.current
@@ -147,7 +162,7 @@ const labelSprite = (text: string, color: string, dark: boolean) => {
         const g = ForceGraph3D()(el)
         // Fresh objects, kept in a ref: the engine writes x/y/z back onto them in place, and
         // that is how "fly to this node" finds where it ended up.
-        const fresh = toForceGraph(kg, hidden, muted, 60, layout === 'xy')
+        const fresh = toForceGraph(kg, hidden, muted, layout === 'xy')
         data.current = fresh
         clouds.current = []
 
@@ -204,14 +219,30 @@ const labelSprite = (text: string, color: string, dark: boolean) => {
           return group
         }
 
+        /** Redraw with the current accessors; never rebuild the scene for a colour. */
+        const repaint = () => {
+          const refresh = (g as Record<string, unknown>).refresh
+          if (typeof refresh === 'function') (refresh as () => void).call(g)
+        }
         set(g, 'width', el.clientWidth)
         set(g, 'height', el.clientHeight)
         set(g, 'backgroundColor', theme === 'light' ? '#f7f8fa' : '#14161a')
         set(g, 'nodeRelSize', 3)
-        set(g, 'nodeLabel', (n: ForceNode) =>
-          labels === 'off' ? '' : (n.label ?? n.id ?? ''),
-        )
-        set(g, 'nodeColor', (n: ForceNode) => n.color ?? (theme === 'light' ? '#4a7bc4' : '#7b9ecb'))
+        set(g, 'nodeLabel', (n: ForceNode) => {
+          if (labels === 'off') return ''
+          const sel = selRef.current
+          if (sel && n.id !== sel) return ''
+          return n.label ?? n.id ?? ''
+        })
+        // The same reading as 2D: a selected node keeps its colour and everything else goes
+        // quiet — dimmed, not shrunk, because relative size is the reading.
+        const dim = theme === 'light' ? '#cdd3dc' : '#333842'
+        set(g, 'nodeColor', (n: ForceNode) => {
+          const sel = selRef.current
+          if (sel && n.id !== sel) return dim
+          return n.color ?? (theme === 'light' ? '#4a7bc4' : '#7b9ecb')
+        })
+        set(g, 'nodeOpacity', (n: ForceNode) => (selRef.current && n.id !== selRef.current ? 0.45 : 1))
         // 3D sizes follow the same claim 2D draws, not the raw number: `px` is the radius the
         // document resolved to, and volume grows as a compressed power of it, so a hub reads as
         // bigger without a small node vanishing next to it.
@@ -224,16 +255,42 @@ const labelSprite = (text: string, color: string, dark: boolean) => {
         })
         // The same reading as 2D, from the same document: width from `power`, colour from the
         // edge, a head only where a direction was asked for.
-        set(g, 'linkWidth', (l: Record<string, unknown>) => edgePx(l, edgeScale))
-        set(g, 'linkColor', (l: Record<string, unknown>) =>
-          (l.color as string) ?? (theme === 'light' ? '#aab3c2' : '#525c6b'),
-        )
+        const pointedAt = (l: Record<string, unknown>) =>
+          l.key !== undefined && (l.key === hoverEdgeRef.current || l.key === hoverLinkRef.current)
+        set(g, 'linkWidth', (l: unknown) => {
+          const link = l as Record<string, unknown>
+          const w = edgePx(link, edgeScale)
+          return pointedAt(link) ? w * 2.4 : w
+        })
+        set(g, 'linkColor', (l: unknown) => {
+          const link = l as Record<string, unknown>
+          if (pointedAt(link)) return '#9dc0ff'
+          return (link.color as string) ?? (theme === 'light' ? '#aab3c2' : '#525c6b')
+        })
+        // Hovering a line names the relation and its power, the way 2D's panel does — in 3D
+        // there is no panel row to point at, so the line carries its own name.
+        set(g, 'linkLabel', (l: unknown) => {
+          const link = l as Record<string, unknown>
+          const what = (link.label as string) || 'related'
+          const power = typeof link.power === 'number' ? link.power : 1
+          return `${what} · power ${power}`
+        })
         set(g, 'linkDirectionalArrowLength', (l: Record<string, unknown>) =>
           edgeShape(l, arrows) === 'line' ? 0 : 3,
         )
-        // This build has no dashed line, so a weak relation is drawn the way a hairline reads
-        // best in 3D: a couple of slow particles travelling along it.
+        // This build has no dashed line — and asking it for one is not harmless: `linkLineDash`
+        // is what took the whole 3D view down once. So a broken relation is drawn the way a
+        // hairline reads best here: a few slow particles travelling along it. Never a solid
+        // line, which would say the relation is stronger than the document claims.
         set(g, 'linkDirectionalParticles', (l: Record<string, unknown>) => (edgeDash(l) ? 3 : 0))
+        // Pointing at a line lights it, in 3D as in 2D: the engine reports the link under the
+        // pointer, and the painters above read it through a ref.
+        set(g, 'onLinkHover', (l: unknown) => {
+          const key = l ? String((l as Record<string, unknown>).key ?? '') : null
+          if (key === hoverLinkRef.current) return
+          hoverLinkRef.current = key || null
+          repaint()
+        })
         set(g, 'linkDirectionalParticleWidth', () => 1.2)
         set(g, 'linkDirectionalParticleSpeed', () => 0.004)
         set(g, 'linkDirectionalParticleColor', (l: Record<string, unknown>) => (l.color as string) ?? '#8b96a8')
@@ -335,6 +392,14 @@ const labelSprite = (text: string, color: string, dark: boolean) => {
       clouds.current = []
     }
   }, [kg, hidden, halos, halosOn, muted, arrows, edgeScale, theme, labels, layout])
+
+  // Selection and the pointed relation are colours, not geometry: repaint, never rebuild.
+  useEffect(() => {
+    const api = inst.current
+    if (!api) return
+    const refresh = (api as Record<string, unknown>).refresh
+    if (typeof refresh === 'function') (refresh as () => void).call(api)
+  }, [selected, hoverEdge])
 
   // Follow a connection in 3D: park the camera along the line from the origin to the node, the
   // standard way to look at one thing without losing where it is.

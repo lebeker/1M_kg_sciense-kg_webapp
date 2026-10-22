@@ -10,7 +10,7 @@ import { describe, expect, test } from 'bun:test'
 import { foldState } from './fold'
 import { toKg, type KgJson } from './kg'
 
-/** A two-branch map: A and B are categories, each with one child, and the children are related. */
+/** A two-branch map: A and B are the category kind, each with one child of a narrower kind. */
 function map(opts: { childEdge?: boolean } = {}): ReturnType<typeof toKg> {
   const doc: KgJson = {
     nodes: [
@@ -38,14 +38,27 @@ const fold = (kg: ReturnType<typeof toKg>, open?: string[]) =>
   })
 
 describe('folding to categories', () => {
-  test('a relation between two children survives as a relation between their hosts', () => {
+  test('a relation between two folded categories survives as a relation between their hosts', () => {
     const kg = map()
-    const state = fold(kg)
-    expect([...state.hidden].sort()).toEqual(['a1', 'b1'])
+    // Both children are categories themselves: a map that keeps its categories shows them.
+    // Folding one of them by hand is what hides it — and what the relation has to survive.
+    const state = foldState(kg, {
+      muted: new Set(),
+      steps: [{ id: 'a1', n: 1 }],
+      kinds: new Set(),
+      foldAll: false,
+    })
+    expect(state.hidden.has('a1')).toBe(true)
     const lifted = state.virtual.find(
-      (v) => (v.a === 'a' && v.b === 'b') || (v.a === 'b' && v.b === 'a'),
+      (v) => (v.a === 'a' && v.b === 'b1') || (v.a === 'b1' && v.b === 'a'),
     )
     expect(lifted?.label).toBe('overlaps')
+  })
+
+  test('a fold with nothing hidden invents nothing', () => {
+    const state = fold(map())
+    expect(state.hidden.size).toBe(0)
+    expect(state.virtual).toEqual([])
   })
 
   test('it does not invent a relation between categories that had none', () => {
@@ -58,14 +71,44 @@ describe('folding to categories', () => {
   })
 
   test('opening a branch keeps its next layer and folds nothing else out', () => {
-    const kg = map()
+    const kg = toKg({
+      nodes: [
+        { id: 'a', label: 'A', kind: 'subject', level: 2 },
+        { id: 'b', label: 'B', kind: 'subject', level: 2 },
+        { id: 'a1', label: 'a1', kind: 'topic', level: 2.6 },
+        { id: 'b1', label: 'b1', kind: 'topic', level: 2.6 },
+      ],
+      edges: [
+        { from: 'a1', to: 'a', label: 'subset of' },
+        { from: 'b1', to: 'b', label: 'subset of' },
+      ],
+    })
     const closed = fold(kg)
     const opened = fold(kg, ['a'])
+    expect([...closed.hidden].sort()).toEqual(['a1', 'b1'])
     expect(opened.hidden.has('a1')).toBe(false)
     expect(opened.hidden.has('b1')).toBe(true)
     // opening one branch never hides something the closed fold had kept
     for (const id of ['a', 'b']) expect(opened.hidden.has(id)).toBe(false)
-    expect(opened.hidden.size).toBeLessThanOrEqual(closed.hidden.size)
+    expect(opened.hidden.size).toBeLessThan(closed.hidden.size)
+  })
+
+  test('only categories keeps a category at any level of a three-layer map', () => {
+    const kg = toKg({
+      nodes: [
+        { id: 'root', label: 'Root', kind: 'science', level: 2 },
+        { id: 'group', label: 'Group', kind: 'science', level: 2.2 },
+        { id: 'class', label: 'Class', kind: 'science', level: 2.2, x: 0, y: 0 },
+        { id: 'work', label: 'A work', kind: 'publication', level: 3 },
+      ],
+      edges: [
+        { from: 'group', to: 'root', label: 'subset of' },
+        { from: 'class', to: 'group', label: 'subset of' },
+        { from: 'work', to: 'class', label: 'about' },
+      ],
+    })
+    const state = fold(kg)
+    expect([...state.hidden]).toEqual(['work'])
   })
 
   test('every visible node is one the document has', () => {

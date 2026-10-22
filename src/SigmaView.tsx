@@ -193,6 +193,10 @@ export default function SigmaView({
       labelSize: 12,
       minCameraRatio: 0.01,
       maxCameraRatio: 20,
+      // Swapping to 3D unmounts this view, and the container is empty for a moment: sigma treats
+      // a zero-width container as a mistake and throws — inside React's commit, which takes the
+      // whole page down. The overlay's ResizeObserver sizes it again the moment it is back.
+      allowInvalidContainer: true,
       edgeReducer: (edge, data) => {
         const a = kg.graph.hasEdge(edge)
           ? (kg.graph.getEdgeAttributes(edge) as Record<string, unknown>)
@@ -439,9 +443,21 @@ export default function SigmaView({
       said = true
       onFirstFrameRef.current?.()
     })
+    // A container with no width is not a reason to resize: sigma throws on it, and a
+    // ResizeObserver callback can arrive after the view was swapped out for 3D. A renderer that
+    // cannot resize is a renderer to leave alone — never a reason to take the page down.
+    const safeResize = () => {
+      if (!el.isConnected || !el.clientWidth || !el.clientHeight) return
+      try {
+        instance.resize()
+      } catch (err) {
+        console.warn('sigma resize failed:', err)
+      }
+    }
     const ro = new ResizeObserver(() => {
+      if (!el.clientWidth || !el.clientHeight) return
       sizeCanvas()
-      instance.resize()
+      safeResize()
       draw()
     })
     ro.observe(el)
@@ -451,6 +467,8 @@ export default function SigmaView({
     // private, and "is the tooltip where it should be" is not a question the DOM can answer.
     ;(el as unknown as { __sigma__?: Sigma }).__sigma__ = instance
     return () => {
+      // Stop watching before the instance goes: a resize reported after `kill()` is a callback
+      // on a dead renderer, and sigma answers it by throwing at a container it can no longer size.
       ro.disconnect()
       el.removeEventListener('mousemove', onMove)
       el.removeEventListener('mouseleave', onLeave)
@@ -458,7 +476,11 @@ export default function SigmaView({
       canvas.remove()
       sigma.current = null
       drawRef.current = () => {}
-      instance.kill()
+      try {
+        instance.kill()
+      } catch {
+        // Already gone: the only thing left to do with a dead renderer is to stop touching it.
+      }
     }
   }, [graph, kg, arrows, edgeScale, theme, labels])
 
@@ -546,7 +568,11 @@ export default function SigmaView({
       cancelAnimationFrame(raf)
       calRef.current = new Set()
       setProgress(null)
-      s.refresh()
+      // Leaving 2D while the budget is still being measured unmounts the renderer first: its
+      // cleanup runs before this one, so `sigma.current` is already null. Refreshing a killed
+      // renderer throws inside React's commit and takes the whole page with it — which is
+      // exactly what switching to 3D did on a graph big enough to be measured.
+      if (sigma.current === s) s.refresh()
     }
   }, [calibrating, kg, onMeasured])
 
@@ -554,8 +580,13 @@ export default function SigmaView({
   // the graph must be fitted again rather than left half-hidden behind the panel.
   useEffect(() => {
     const s = sigma.current
-    if (!s) return
-    s.resize()
+    const box = host.current
+    if (!s || !box?.isConnected || !box.clientWidth || !box.clientHeight) return
+    try {
+      s.resize()
+    } catch (err) {
+      console.warn('sigma resize failed:', err)
+    }
     fitCamera(s.getCamera(), fitSignal > 0)
   }, [fitSignal, insetRight])
 

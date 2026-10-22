@@ -353,6 +353,12 @@ export default function App() {
 
   /** What the numbers in `weight` measure, as the document itself states it. */
   const weightMetric = kg?.meta?.weight?.metric ?? 'connections'
+  // A number is not a quantity until it says of what — but the panel needs a unit, not the
+  // paragraph that defines it. The document keeps the sentence; this keeps its first clause.
+  const weightUnit = (() => {
+    const first = weightMetric.split(/\s+[—–-]\s+|(?<=[a-z])\.\s/)[0].trim()
+    return first.length > 56 ? `${first.slice(0, 53)}…` : first
+  })()
 
   /**
    * The two numbers the document asks the page for. They are a request, not a stop: the document
@@ -1087,6 +1093,9 @@ export default function App() {
         </div>
       ) : null}
 
+      {/* Status rows belong under the bar, not at the top of the page: the header floats above
+          the flow, so a banner laid out here would be drawn across the title. */}
+      <div className="banners">
       {overDocLimits && !drawAllAnyway && foldAll ? (
         <div className="banner" data-limits="over">
           <b>
@@ -1118,6 +1127,7 @@ export default function App() {
           )}
         </div>
       ) : null}
+      </div>
 
       {hits.length > 0 && (
         <ul className="hits">
@@ -1168,6 +1178,8 @@ export default function App() {
             <ThreeView
               kg={kg}
               onSelect={onSelect}
+              selected={selected}
+              hoverEdge={hoverEdge}
               halos={halos}
               halosOn={halosOn}
               muted={muted}
@@ -1354,6 +1366,11 @@ export default function App() {
             <dt>weight</dt>
             <dd>
               {nodeAttrs.weight != null ? String(nodeAttrs.weight) : '—'}
+              {/* A number is not a quantity until it says of what: the document states the
+                  metric, and a reader who has to guess the unit has not been told the weight. */}
+              {nodeAttrs.weight != null && nodeAttrs.weight_from === 'document' ? (
+                <span className="unit"> {weightUnit}</span>
+              ) : null}
               {nodeAttrs.weight != null ? (
                 <span className="from">
                   {nodeAttrs.weight_from === 'document'

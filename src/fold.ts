@@ -295,6 +295,19 @@ export function foldState(
     }
   }
 
+  // What a *category* is, is a fact about the document, not a level: the kinds that sit on the
+  // top level are the categories, whatever depth a particular one was written at.
+  const categoryKinds = new Set<string>()
+  {
+    let top = Number.POSITIVE_INFINITY
+    kg.graph.forEachNode((id) => {
+      top = Math.min(top, levelOf(kg, id))
+    })
+    kg.graph.forEachNode((id, a) => {
+      if (levelOf(kg, id) === top) categoryKinds.add(String(a.kind ?? 'unknown'))
+    })
+  }
+
   if (foldAll) {
     // Fold the map up to its categories: every node that is not on the top layer goes into the
     // layer above it, deepest first. What is left is the category graph, each node carrying what
@@ -304,13 +317,12 @@ export function foldState(
     // a map, not a lock: opening one category asks to see one step down *there*, while the rest
     // of the map stays folded. Without that, a fold made by the legend could only be undone by
     // undoing the whole reading.
+    // "Only categories" leaves every category standing — at whatever level it sits. A field map
+    // has one category layer (5 concepts); a category map has three (6 roots, 26 groups, 78
+    // classes), and a fold that leaves 6 of 1,606 nodes has folded the map it was asked to show.
     const keep = new Set<string>()
-    let top = Number.POSITIVE_INFINITY
-    kg.graph.forEachNode((id) => {
-      top = Math.min(top, levelOf(kg, id))
-    })
-    kg.graph.forEachNode((id) => {
-      if (levelOf(kg, id) === top) keep.add(id)
+    kg.graph.forEachNode((id, a) => {
+      if (categoryKinds.has(String(a.kind ?? 'unknown'))) keep.add(id)
     })
     const opened = [...(open ?? [])].sort((a, b) => levelOf(kg, a) - levelOf(kg, b) || a.localeCompare(b))
     for (const id of opened) {
@@ -362,11 +374,13 @@ export function foldState(
   kg.graph.forEachEdge((_key, attrs, s, t) => {
     const a = attrs as Record<string, unknown>
     if (a.agg) return
-    // A work is evidence *inside* a host: its `about` and `cites` describe what the host
-    // contains, not what the host relates to. Lifting those would draw one line per pair of
-    // categories for a fact the ring around the node already states — and a six-node map would
-    // come out as a hairball. Structure lifts; evidence stays inside.
-    if (kindOf(kg, s) === 'publication' || kindOf(kg, t) === 'publication') return
+    // Structure lifts; evidence stays inside. A work, a person, a funder is *contained* by a
+    // category — its `about`, `authored`, `works at` describe what the host contains, not what
+    // the host relates to. Lifting those draws one line per pair of categories for a fact the
+    // ring around the node already states, and a hundred-category map comes out a hairball.
+    const sk = kindOf(kg, s)
+    const tk = kindOf(kg, t)
+    if (!categoryKinds.has(sk) || !categoryKinds.has(tk)) return
     const from = survivorOf(s)
     const to = survivorOf(t)
     if (!from.length || !to.length) return
@@ -416,7 +430,15 @@ export function foldState(
       }
     }
   })
-  for (const { a, b, n, kind } of shares.values()) {
+  // A shared funder between two of six categories is a finding; between two of a hundred and
+  // ten it is a coincidence, and one line per pair per kind turns the summary into a hairball.
+  // So a summary keeps what repeats (two or more shared things) and, of those, the strongest
+  // forty — the panel still lists every connection a node has, one node at a time.
+  const kept = [...shares.values()]
+    .filter((s) => s.n >= 2)
+    .sort((x, y) => y.n - x.n || `${x.a}|${x.b}|${x.kind}`.localeCompare(`${y.a}|${y.b}|${y.kind}`))
+    .slice(0, 40)
+  for (const { a, b, n, kind } of kept) {
     virtualBy.set(`share|${a}|${b}|${kind}`, { a, b, power: n, label: `shares ${kind}` })
   }
 

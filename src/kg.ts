@@ -88,6 +88,9 @@ export type KgNode = {
   tags?: string[]
   x?: number
   y?: number
+  /** Where it sits in depth, when the author placed it there. 3D reads this first; `level` and
+   *  then `weight` are only the fallbacks, so a document can hold its own 3D shape. */
+  z?: number
   parent?: string
   /**
    * Every other key is a property in its own right: carried through untouched, and the panel

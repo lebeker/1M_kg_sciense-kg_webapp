@@ -420,6 +420,15 @@ button {
 .measuring i { font-style: normal; font-size: 11px; opacity: 0.6; }
 
 /* Over budget: said out loud, with the way past it. */
+.banners {
+  position: absolute;
+  top: var(--bar-h);
+  left: 0;
+  right: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+.banners > * { pointer-events: auto; }
 .banner {
   display: flex;
   align-items: center;
@@ -434,6 +443,7 @@ button {
   font-size: 12px;
 }
 .banner span { color: var(--text-3); }
+.panel dd .unit { color: var(--text-2); }
 .banner button { margin-left: auto; }
 
 /* One relation word per block, foldable, with the nodes it reaches collapsible. */

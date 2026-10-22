@@ -21,6 +21,8 @@ export type ForceNode = {
 }
 
 export type ForceLink = {
+  /** The edge key in the document, so a view can highlight the line a reader is pointing at. */
+  key?: string
   source: string
   target: string
   label?: string
@@ -44,16 +46,20 @@ export type ForceGraphData = { nodes: ForceNode[]; links: ForceLink[] }
  * `source`/`target` strings for node references and writes x/y/z back onto the
  * nodes, so handing it the live graph would corrupt the shared data layer.
  *
- * `z` carries hierarchy when the document has `level` (top level nearest the camera).
- * A graph with no levels at all still has a vertical reading: `weight` — how much a thing
- * counts on this map — normalised to the span the picture already has, so depth is a tilt of
- * the same map and not a spike beside it. That is gravity, without inventing a hierarchy.
+ * Depth is a property of the document before it is a property of this adapter:
+ *
+ *   1. `z` on the node — the author placed it in space, and nothing here second-guesses that;
+ *   2. `level` — the hierarchy read as a tilt: the shallowest level nearest the camera, the
+ *      deepest furthest, across a span that follows the picture's own width. A fixed number of
+ *      units per level (60, once) made a map 2,238 units wide 60 deep — a flat disc with an
+ *      invisible dent;
+ *   3. `weight` — gravity, only when the document said neither. How much a thing counts,
+ *      normalised to the same span.
  */
 export function toForceGraph(
   kg: Kg,
   hidden?: Set<string>,
   muted?: Set<string>,
-  zScale = 60,
   /** Hold every node where the document put it: the 3D view becomes the 2D picture, with `level`
    *  as depth. Without this the simulation is free to rearrange the graph, which is why the two
    *  views used to look like two different maps. */
@@ -66,6 +72,8 @@ export function toForceGraph(
   // picture already is, and what range the weights span. A depth axis longer than the drawing
   // is what makes a 3D view look like a mistake.
   let anyLevel = false
+  let lMin = Infinity
+  let lMax = -Infinity
   let wMin = Infinity
   let wMax = -Infinity
   let xMin = Infinity
@@ -74,7 +82,11 @@ export function toForceGraph(
   let yMax = -Infinity
   kg.graph.forEachNode((id, a) => {
     if (skip.has(id)) return
-    if (typeof a.level === 'number') anyLevel = true
+    if (typeof a.level === 'number') {
+      anyLevel = true
+      if (a.level < lMin) lMin = a.level
+      if (a.level > lMax) lMax = a.level
+    }
     const w = typeof a.weight === 'number' ? a.weight : 0
     if (w < wMin) wMin = w
     if (w > wMax) wMax = w
@@ -95,11 +107,14 @@ export function toForceGraph(
   kg.graph.forEachNode((id, a) => {
     if (skip.has(id)) return
     const w = typeof a.weight === 'number' ? a.weight : 0
-    const z = typeof a.level === 'number'
-      ? -a.level * zScale
-      : anyLevel || depth === 0
-        ? 0
-        : -(byWeight(w) - 0.5) * depth
+    const z =
+      typeof a.z === 'number' && Number.isFinite(a.z)
+        ? a.z
+        : anyLevel && typeof a.level === 'number'
+          ? -(lMax > lMin ? (a.level - lMin) / (lMax - lMin) : 0) * depth
+          : anyLevel || depth === 0
+            ? 0
+            : -(byWeight(w) - 0.5) * depth
     const node: ForceNode = {
       id,
       label: typeof a.label === 'string' ? a.label : id,
@@ -108,9 +123,9 @@ export function toForceGraph(
       size: typeof a.px === 'number' ? a.px : typeof a.size === 'number' ? a.size : 2,
       z,
     }
-    // Weight fixes the depth only where there is no hierarchy to read: the force layout keeps
-    // arranging x and y, and the node keeps its own height instead of drifting in z.
-    if (!anyLevel && depth > 0) node.fz = z
+    // Depth is a reading, not a simulation result: the force layout still arranges x and y,
+    // but a node keeps the height the document (or its level, or its weight) gave it.
+    if (!pin) node.fz = z
     if (typeof a.x === 'number') node.x = a.x
     if (typeof a.y === 'number') node.y = a.y
     if (pin && typeof node.x === 'number' && typeof node.y === 'number') {
@@ -127,6 +142,7 @@ export function toForceGraph(
     // A muted relation is not drawn in either view: muting is one decision, read by both.
     if (muted?.size && muted.has(relationOf(a as Record<string, unknown>))) return
     const link: ForceLink = {
+      key: _key,
       source,
       target,
       power: typeof a.power === 'number' ? a.power : 1,
