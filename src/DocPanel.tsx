@@ -1,9 +1,17 @@
 import { useMemo, useState } from 'react'
 
+type Doc = { file: string; title?: string; role?: string }
+
 type Props = {
   /** The path of the note as the folder has it, e.g. `docs/aging.md`. */
   name: string
   md: string
+  /** Every document the graph declares, in `docs/index.json` order. One document is a note. */
+  list?: Doc[]
+  onPick?: (file: string) => void
+  /** Node ids, so a name written in backticks can select the node it names. */
+  nodeIds?: Set<string>
+  onNode?: (id: string) => void
   onClose: () => void
 }
 
@@ -21,11 +29,23 @@ type Props = {
  * write. That last one is the honest path for an agent-built graph: the file has an owner, and
  * the owner is not the browser.
  */
-export default function DocPanel({ name, md, onClose }: Props) {
+export default function DocPanel({ name, md, list, onPick, nodeIds, onNode, onClose }: Props) {
   const text = md
   const [saved, setSaved] = useState<string | null>(null)
   const path = name.startsWith('docs/') ? name : `docs/${name.endsWith('.md') ? name : `${name}.md`}`
-  const html = useMemo(() => mdToHtml(md), [md])
+  const html = useMemo(() => mdToHtml(md, nodeIds), [md, nodeIds])
+  const here = path.replace(/^docs\//, '')
+  const docs = list && list.length > 1 ? list : []
+  // Two documents can share a role (two notes, two methods). Then the role is not a label:
+  // say what the document is instead.
+  const seen = new Map<string, number>()
+  for (const d of docs) seen.set(d.role || 'note', (seen.get(d.role || 'note') ?? 0) + 1)
+  const label = (d: Doc) => {
+    const role = d.role || 'note'
+    if ((seen.get(role) ?? 0) < 2) return role
+    const title = (d.title || d.file).replace(/\.md$/, '')
+    return title.length > 22 ? `${title.slice(0, 21)}…` : title
+  }
 
   const download = () => {
     const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
@@ -63,7 +83,31 @@ export default function DocPanel({ name, md, onClose }: Props) {
       </header>
 
       <>
-          <div className="doc-body" dangerouslySetInnerHTML={{ __html: html }} />
+          {docs.length > 0 && (
+            <nav className="doc-tabs" aria-label="the documents in this graph">
+              {docs.map((d) => (
+                <button
+                  key={d.file}
+                  className={d.file === here ? 'on' : ''}
+                  data-doc-role={d.role || 'note'}
+                  title={d.title || d.file}
+                  onClick={() => onPick?.(`docs/${d.file}`)}
+                >
+                  {label(d)}
+                </button>
+              ))}
+            </nav>
+          )}
+
+          <div
+            className="doc-body"
+            onClick={(e) => {
+              const ref = (e.target as HTMLElement).closest('code.node-ref')
+              const id = ref?.getAttribute('data-node')
+              if (id && onNode) onNode(id)
+            }}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
           <footer>
             <span className="note">{saved ?? 'the file is the source of truth — this is a copy'}</span>
             <button onClick={copy}>copy</button>
@@ -88,7 +132,7 @@ export default function DocPanel({ name, md, onClose }: Props) {
  * more code than the viewer it lives in. Unknown syntax stays visible as text, which is the right
  * failure for a note: you can see what it says.
  */
-function mdToHtml(md: string): string {
+function mdToHtml(md: string, nodeIds?: Set<string>): string {
   const esc = md
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -113,18 +157,38 @@ function mdToHtml(md: string): string {
     .replace(/^\s*[-*]\s+(.*)$/gm, '<li>$1</li>')
   rest = rest.replace(/(?:<li[^>]*>[\s\S]*?<\/li>\s*)+/g, (m) => `<ul>${m}</ul>`)
 
+  // Pipe tables. A coverage report is a table and nothing else, so this is not a flourish: a
+  // markdown file whose whole point is the grid must not arrive as rows of prose.
+  rest = rest.replace(/(?:^\|.*\|[ \t]*\n?)+/gm, (block: string) => {
+    const rows = block.trim().split('\n').map((l) => l.trim()).filter(Boolean)
+    if (rows.length < 2) return block
+    const cells = (l: string) => l.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
+    const head = cells(rows[0])
+    const body = rows.slice(1).filter((l) => !/^\|[\s:|-]+\|$/.test(l)).map(cells)
+    const th = head.map((c) => `<th>${c}</th>`).join('')
+    const tb = body.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')
+    return `<table><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table>`
+  })
+
   rest = rest
     .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/`([^`]+)`/g, (_m, code: string) => {
+      // A name in backticks that is a node id is a claim the reader can check: click it and
+      // the map selects that node. Anything else stays plain code.
+      if (nodeIds?.has(code)) {
+        return `<code class="node-ref" data-node="${code}" title="select this node on the map">${code}</code>`
+      }
+      return `<code>${code}</code>`
+    })
 
   const out = rest
     .split(/\n{2,}/)
     .map((chunk) => {
       const t = chunk.trim()
       if (!t) return ''
-      if (/^<(h\d|ul|pre|blockquote|hr|li)/.test(t)) return t
+      if (/^<(h\d|ul|pre|blockquote|hr|li|table)/.test(t)) return t
       if (/^\u0000\d+\u0000$/.test(t)) return blocks[Number(t.slice(1, -1))]
       return `<p>${t.replace(/\n/g, ' ')}</p>`
     })

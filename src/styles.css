@@ -288,6 +288,40 @@ button {
 
 /* Where a document property's value comes from, in words — "by relevant papers" is part of the
    reading, not a footnote. */
+/* The document set: one button per role, because "the report" and "the method" are different
+   documents to a reader, not tabs of one note. */
+.doc .doc-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 6px 10px 0;
+  border-bottom: 1px solid var(--line, #2a2f39);
+}
+.doc .doc-tabs button {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  padding: 4px 8px;
+  border-radius: 6px 6px 0 0;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: none;
+  color: var(--muted);
+}
+.doc .doc-tabs button.on {
+  color: var(--fg);
+  border-color: var(--line, #2a2f39);
+  background: var(--card, #1a1d23);
+}
+/* A node named in a document is a link into the map: click it and the map selects it. */
+.doc .doc-body code.node-ref {
+  cursor: pointer;
+  border-bottom: 1px dotted var(--muted);
+}
+.doc .doc-body code.node-ref:hover {
+  color: var(--accent, #9dc0ff);
+}
+
 .panel .from {
   display: block;
   color: var(--muted);
@@ -550,6 +584,25 @@ button.tiny:hover, button.link:hover { color: var(--accent-soft); }
   color: var(--text-3);
 }
 .doc-body ul { padding-left: 18px; }
+/* A coverage report is a grid: the table is the document, so it gets the room. */
+.doc-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0 16px;
+  font-size: 12px;
+}
+.doc-body th,
+.doc-body td {
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line, #2a2f39);
+  vertical-align: top;
+}
+.doc-body th {
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
 .doc-edit {
   flex: 1;
   margin: 10px;

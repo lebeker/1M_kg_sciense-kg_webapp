@@ -184,6 +184,14 @@ function LabelSwitch({ mode, onChange }: { mode: LabelMode; onChange: (m: LabelM
 export default function App() {
   const [kg, setKg] = useState<Kg | null>(null)
   const [docs, setDocs] = useState<Record<string, string>>({})
+  /** The documents this graph declares, by role; `docs/index.json` is where they come from. */
+  const nodeIdSet = useMemo(() => new Set<string>(kg ? kg.graph.nodes() : []), [kg])
+  const docList = useMemo(() => {
+    const raw = (kg?.meta as unknown as { docs?: { file?: string; title?: string; role?: string }[] } | undefined)?.docs
+    return (raw ?? [])
+      .filter((d) => d && typeof d.file === 'string' && d.file)
+      .map((d) => ({ file: String(d.file), title: String(d.title ?? ''), role: String(d.role ?? 'note') }))
+  }, [kg])
   const [mode, setMode] = useState<'2d' | '3d'>('2d')
   const [selected, setSelected] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -477,8 +485,11 @@ export default function App() {
     // name rather than by a key the folder happened to choose.
     const keys = Object.keys(docs)
     const byName = (name: string) => keys.find((k) => k.split('/').pop() === name) ?? null
-    return byName('overview.md') ?? byName('index.md')
-  }, [docs])
+    // A graph with a doc set may have no overview.md at all: `docs/index.json` is the list, and
+    // the first declared document is the one the button opens.
+    const first = docList[0]?.file
+    return byName('overview.md') ?? byName('index.md') ?? (first ? `docs/${first}` : null)
+  }, [docs, docList])
 
   /**
    * The view the fold decisions produce. Recomputed from the document every time a decision
@@ -941,10 +952,12 @@ export default function App() {
             <button
               className="notes"
               data-notes={overview}
-              onClick={() => setDoc(overview)}
-              title="the notes written beside this graph"
+              onClick={() => setDoc(docList.length ? `docs/${docList[0].file}` : overview)}
+              title={docList.length > 1
+                ? `${docList.length} documents written beside this graph — the report, the method, the sources`
+                : 'the notes written beside this graph'}
             >
-              notes
+              {docList.length > 1 ? 'docs' : 'notes'}
               {/* a page, once folded */}
               <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
                 <path
@@ -1581,7 +1594,15 @@ export default function App() {
       )}
 
       {doc !== null ? (
-        <DocPanel name={doc} md={docs[doc] ?? ''} onClose={() => setDoc(null)} />
+        <DocPanel
+          name={doc}
+          md={docs[doc] ?? ''}
+          list={docList}
+          onPick={(file) => setDoc(file)}
+          nodeIds={nodeIdSet}
+          onNode={(id) => setSelected(id)}
+          onClose={() => setDoc(null)}
+        />
       ) : null}
     </div>
   )
