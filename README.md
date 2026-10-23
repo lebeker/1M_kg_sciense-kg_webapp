@@ -3,12 +3,15 @@
 A React viewer for a `kg/1` knowledge-graph document — the web-app half of a
 knowledge-graph skill.
 
-**Two worked cases:** <https://lebeker.github.io/1M_kg_sciense-kg_webapp/> — a drug overview of the
-neurokinin antagonist class (35 nodes), and a field survey of longevity research (1,817 nodes, 110
-categories, 1,563 works), where the graph carries nine documents and the report beside the map is
-readable in the page. Each case shows the document it came from and the page it renders into. It
-builds to **one self-contained HTML file** with every script and style inlined, so it opens from
-`file://` with no server, no network and no build step on the reader's machine.
+**Two worked cases:** a [drug overview](https://lebeker.github.io/1M_kg_sciense-kg_webapp/lynkuet/)
+of the neurokinin antagonist class (35 nodes), and a
+[field survey](https://lebeker.github.io/1M_kg_sciense-kg_webapp/catmap/) of longevity research
+(1,817 nodes, 110 categories, 1,563 works), where the graph carries nine documents and the report
+beside the map is readable in the page. Both are on
+<https://lebeker.github.io/1M_kg_sciense-kg_webapp/>, each showing the document it came from and
+the page it renders into. It builds to **one self-contained HTML file** with every script and style
+inlined, so it opens from `file://` with no server, no network and no build step on the reader's
+machine.
 
 ## The graph object
 
