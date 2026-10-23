@@ -921,6 +921,39 @@ export default function App() {
       data-halos={halosOn ? 'on' : 'off'}
     >
       <header className="bar">
+        {/* The documents are not one control among many: beside a graph they are the other half
+            of the artifact, so they get a column of their own at the left edge, and the title and
+            controls start after it. */}
+        <div className="rail">
+          {overview ? (
+            <button
+              className="notes rail-notes"
+              data-notes={overview}
+              aria-pressed={!!doc}
+              onClick={() => setDoc(doc ? null : docList.length ? `docs/${docList[0].file}` : overview)}
+              title={docList.length > 1
+                ? `${docList.length} documents written beside this graph — the report, the method, the sources`
+                : 'the notes written beside this graph'}
+            >
+              {/* a page, once folded */}
+              <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+                <path
+                  d="M6 3.5h8.2L18 7.3V20a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 20V3.5Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+                <path d="M14 3.8V8h4.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M9 12h6M9 15.5h6" stroke="currentColor" strokeWidth="1.4" />
+              </svg>
+              <span>{docList.length > 1 ? 'docs' : 'notes'}</span>
+              {docList.length > 1 ? <i className="n">{docList.length}</i> : null}
+            </button>
+          ) : null}
+        </div>
+
+        <div className="headcol">
         {/* Two rows: the document names itself above, the controls below. One row of everything
             is what squeezed the title into an ellipsis the moment the window was not wide. */}
         <div className="titlerow">
@@ -947,31 +980,6 @@ export default function App() {
               if (e.key === 'Escape') setQuery('')
             }}
           />
-
-          {overview ? (
-            <button
-              className="notes"
-              data-notes={overview}
-              onClick={() => setDoc(docList.length ? `docs/${docList[0].file}` : overview)}
-              title={docList.length > 1
-                ? `${docList.length} documents written beside this graph — the report, the method, the sources`
-                : 'the notes written beside this graph'}
-            >
-              {docList.length > 1 ? 'docs' : 'notes'}
-              {/* a page, once folded */}
-              <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-                <path
-                  d="M6 3.5h8.2L18 7.3V20a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 20V3.5Z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinejoin="round"
-                />
-                <path d="M14 3.8V8h4.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
-                <path d="M9 12h6M9 15.5h6" stroke="currentColor" strokeWidth="1.4" />
-              </svg>
-            </button>
-          ) : null}
 
           {/* The page's own address. A self-contained file still knows where it lives, and a
               reader who closes the tab should be able to get back to it without being told the
@@ -1097,6 +1105,7 @@ export default function App() {
               3D
             </button>
           </div>
+        </div>
         </div>
       </header>
 

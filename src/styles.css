@@ -81,13 +81,49 @@ body {
   right: 0;
   height: var(--bar-h);
   display: flex;
-  flex-direction: column;
+  /* Two columns: a rail on the left for the documents, then the title and the controls. */
+  flex-direction: row;
   align-items: stretch;
   gap: 0;
   padding: 0;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   border-bottom: 1px solid var(--line);
   z-index: 3;
+}
+
+.bar .rail {
+  flex: 0 0 58px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8px;
+  border-right: 1px solid var(--line);
+}
+.bar .headcol {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* The one control in the rail: the folder of documents. It reads as a tab on the artifact, not
+   as an icon among icons, so it carries its own label and the count. */
+.rail-notes {
+  flex-direction: column;
+  gap: 3px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+.rail-notes[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--surface-2);
+}
+.rail-notes .n {
+  font-style: normal;
+  font-size: 9.5px;
+  color: var(--muted);
 }
 
 .titlerow {
@@ -535,15 +571,73 @@ button.tiny:hover, button.link:hover { color: var(--accent-soft); }
 /* The notes panel: a second panel, beside the first, for the long form of a description. */
 .doc {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: var(--bar-h);
+  left: 0;
   bottom: 0;
-  width: min(760px, 62vw);
+  /* Left-docked and never wider than the room the node panel leaves: with the documents on the
+     left, selecting a node opens its panel on the right and both stay readable. */
+  width: min(820px, calc(100vw - 372px));
   display: flex;
-  flex-direction: column;
-  border-left: 1px solid var(--border-soft);
+  flex-direction: row;
+  border-right: 1px solid var(--border-soft);
   background: var(--canvas);
   z-index: 6;
+}
+/* The folder, as a folder: rows on the left, the open document beside them. */
+.doc-tree {
+  flex: 0 0 210px;
+  overflow: auto;
+  padding: 6px 0 24px;
+  border-right: 1px solid var(--rule);
+}
+.doc-tree .tree-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 4px 12px 8px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.doc-tree .tree-head:hover { color: var(--text-2); }
+/* Folded, the folder is a strip: the document gets the room back. */
+.doc-tree.closed { flex-basis: 26px; }
+.doc-tree.closed .tree-head { padding: 4px 6px 8px; }
+.doc-tree.closed .tree-head .lbl { display: none; }
+.doc-tree .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 8px;
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.doc-tree .row:hover { background: var(--surface-2); }
+.doc-tree .row.on {
+  background: var(--surface-2);
+  color: var(--text-1);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.doc-tree .row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-tree .row .role { margin-left: auto; font-size: 9.5px; color: var(--text-3); }
+.doc-tree .row .chev { width: 9px; font-size: 9px; color: var(--text-3); }
+.doc-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 .doc header {
   display: flex;

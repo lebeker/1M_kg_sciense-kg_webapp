@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 
 type Doc = { file: string; title?: string; role?: string }
 
@@ -67,63 +67,126 @@ export default function DocPanel({ name, md, list, onPick, nodeIds, onNode, onCl
     }
   }
 
+  // The folder, not a row of badges. A document set is a set of files, and a reader looks for
+  // them the way they look for files: a list on the left with the open one marked, folders that
+  // fold. Roles still travel on each row (`data-doc-role`) so a page can style or test them.
+  const [folded, setFolded] = useState<Set<string>>(new Set())
+  const tree = useMemo(() => buildTree(docs.length ? docs : [{ file: here, title: path }]), [docs, here, path])
+  const toggle = (key: string) =>
+    setFolded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+
+  const rows = (nodes: TreeNode[], prefix: string): ReactNode[] =>
+    nodes.flatMap((n) => {
+      const key = prefix ? `${prefix}/${n.name}` : n.name
+      const isDir = !n.file
+      const open = !folded.has(key)
+      const depth = key.split('/').length
+      return [
+        <button
+          key={key}
+          className={`row${isDir ? ' dir' : ''}${n.file === here ? ' on' : ''}`}
+          style={{ paddingLeft: 8 + depth * 11 }}
+          data-doc-role={isDir ? undefined : n.role || 'note'}
+          data-doc-open={n.file === here ? 'on' : undefined}
+          title={n.title || n.file || key}
+          onClick={() => (isDir ? toggle(key) : onPick?.(`docs/${n.file}`))}
+        >
+          {isDir ? <span className="chev">{open ? '▾' : '▸'}</span> : null}
+          <span className="name">{isDir ? `${n.name}/` : label(n as Doc)}</span>
+          {!isDir && n.role ? <span className="role">{n.role}</span> : null}
+        </button>,
+        ...(isDir && open ? rows(n.kids, key) : []),
+      ]
+    })
+
   return (
     <aside className="doc">
-      <header>
-        <code className="path">{path}</code>
-        <div className="spacer" />
+      <nav
+        className={`doc-tree${folded.has('') ? ' closed' : ''}`}
+        aria-label="the documents in this graph"
+      >
         <button
-          className="off"
-          disabled
-          title="a page opened from a file cannot write to your disk. The agent holds the file: hand the note over and it edits docs/ itself. Copy or download it from here if you want it in hand."
+          className="tree-head"
+          data-doc-tree={folded.has('') ? 'closed' : 'open'}
+          title={folded.has('') ? 'show the documents' : 'fold the document list away'}
+          onClick={() => toggle('')}
         >
-          edit
+          <span className="chev">{folded.has('') ? '▸' : '▾'}</span>
+          <span className="lbl">docs</span>
         </button>
-        <button onClick={onClose}>×</button>
-      </header>
+        {folded.has('') ? null : rows(tree, '')}
+      </nav>
 
-      <>
-          {docs.length > 0 && (
-            <nav className="doc-tabs" aria-label="the documents in this graph">
-              {docs.map((d) => (
-                <button
-                  key={d.file}
-                  className={d.file === here ? 'on' : ''}
-                  data-doc-role={d.role || 'note'}
-                  title={d.title || d.file}
-                  onClick={() => onPick?.(`docs/${d.file}`)}
-                >
-                  {label(d)}
-                </button>
-              ))}
-            </nav>
-          )}
+      <div className="doc-main">
+        <header>
+          <code className="path">{path}</code>
+          <div className="spacer" />
+          <button
+            className="off"
+            disabled
+            title="a page opened from a file cannot write to your disk. The agent holds the file: hand the note over and it edits docs/ itself. Copy or download it from here if you want it in hand."
+          >
+            edit
+          </button>
+          <button onClick={onClose}>×</button>
+        </header>
 
-          <div
-            className="doc-body"
-            onClick={(e) => {
-              const ref = (e.target as HTMLElement).closest('code.node-ref')
-              const id = ref?.getAttribute('data-node')
-              if (id && onNode) onNode(id)
-            }}
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
-          <footer>
-            <span className="note">{saved ?? 'the file is the source of truth — this is a copy'}</span>
-            <button onClick={copy}>copy</button>
-            <button onClick={download}>download</button>
-            {/* In the Hermes pane this arrives as a prompt; in a plain browser it is inert,
-                which is why the other two buttons exist. */}
-            <button
-              className="agent"
-              data-hermes-send={`Revise the note ${path} in this graph with what you have learned: keep it accurate, keep it short, and say where each claim comes from.`}
-            >
-              hand it to the agent
-            </button>
-          </footer>
-      </>
+        <div
+          className="doc-body"
+          onClick={(e) => {
+            const ref = (e.target as HTMLElement).closest('code.node-ref')
+            const id = ref?.getAttribute('data-node')
+            if (id && onNode) onNode(id)
+          }}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+        <footer>
+          <span className="note">{saved ?? 'the file is the source of truth — this is a copy'}</span>
+          <button onClick={copy}>copy</button>
+          <button onClick={download}>download</button>
+          {/* In the Hermes pane this arrives as a prompt; in a plain browser it is inert,
+              which is why the other two buttons exist. */}
+          <button
+            className="agent"
+            data-hermes-send={`Revise the note ${path} in this graph with what you have learned: keep it accurate, keep it short, and say where each claim comes from.`}
+          >
+            hand it to the agent
+          </button>
+        </footer>
+      </div>
     </aside>
   )
+}
+
+type TreeNode = { name: string; file?: string; title?: string; role?: string; kids: TreeNode[] }
+
+/** `a.md`, `notes/b.md` — a folder is whatever the paths say it is. */
+function buildTree(files: Doc[]): TreeNode[] {
+  const root: TreeNode = { name: '', kids: [] }
+  for (const d of files) {
+    const parts = d.file.replace(/^docs\//, '').replace(/^\.?\//, '').split('/')
+    let cur = root
+    parts.forEach((part, i) => {
+      const last = i === parts.length - 1
+      let node = cur.kids.find((k) => k.name === part)
+      if (!node) {
+        node = { name: part, kids: [] }
+        cur.kids.push(node)
+      }
+      if (last) {
+        node.file = d.file
+        node.title = d.title
+        node.role = d.role
+      }
+      cur = node
+    })
+  }
+  return root.kids
 }
 
 /**
