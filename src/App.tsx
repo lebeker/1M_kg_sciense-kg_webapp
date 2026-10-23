@@ -1620,7 +1620,7 @@ export default function App() {
           list={docList}
           onPick={(file) => setDoc(file)}
           nodeIds={nodeIdSet}
-          onNode={(id) => setSelected(id)}
+          onNode={onFollow}
           onClose={() => setDoc(null)}
         />
       ) : null}
