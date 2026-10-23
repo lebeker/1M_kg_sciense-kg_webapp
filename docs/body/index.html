@@ -135,7 +135,8 @@ function paint(l, root, tag) {
       o.material.color.setScalar(0.72);   // the lights clip this small surface otherwise
       return;
     }
-    const base = keep ? o.material.color.clone()
+    const base = l.id === "skin" ? c.clone()
+      : keep ? o.material.color.clone()
       : l.id === "muscles" ? new THREE.Color(0x9e3b38)
       : (o.material && o.material.color ? o.material.color.clone().lerp(c, 0.5) : c);
     const m = new THREE.MeshStandardMaterial({
@@ -175,6 +176,9 @@ async function boot() {
     if (l.filesBySex) return;
     (l.files || [l.id]).forEach(f => jobs.push(loadFile(l.id, f)));
   });
+  jobs.push(loadFile("skin", "skinbits"));
+  jobs.push(loadFile("skin", "skin-female", "female"));
+  jobs.push(loadFile("skin", "skin", "male"));
   jobs.push(loadFile("reproductive", "reproductive-female", "female"));
   jobs.push(loadFile("reproductive", "reproductive-male", "male"));
   await Promise.all(jobs);
@@ -213,7 +217,7 @@ function buildLegend() {
     row.className = "row" + (state.hidden.has(l.id) ? " off" : "");
     row.dataset.layer = l.id;
     row.innerHTML = `<span class="dot" style="background:#${l.color.toString(16).padStart(6,"0")}"></span>` +
-      `<span class="nm">${l.name}</span><span class="cnt">${l.id === "reproductive" ? variantCount(state.sex) : (counts[l.id] || 0)}</span>` +
+      `<span class="nm">${l.name}</span><span class="cnt">${groups[l.id] && Object.keys(groups[l.id].userData.variants || {}).length ? variantCount(l.id, state.sex) : (counts[l.id] || 0)}</span>` +
       `<button class="eye" title="show / hide">${state.hidden.has(l.id) ? EYE_SHUT : EYE_OPEN}</button>`;
     row.onclick = e => {
       if (e.target.closest(".eye")) { toggle(l.id); return; }
@@ -225,8 +229,8 @@ function buildLegend() {
   });
 }
 
-function variantCount(sex) {
-  const g = groups.reproductive;
+function variantCount(id, sex) {
+  const g = groups[id];
   const v = g && g.userData.variants[sex];
   if (!v) return 0;
   let n = 0;
@@ -243,17 +247,24 @@ function toggle(id) {
 function applySex() {
   const g = groups.reproductive;
   if (!g) return;
-  Object.entries(g.userData.variants).forEach(([sex, obj]) => { obj.visible = sex === state.sex; });
+  Object.values(groups).forEach(gr => {
+    if (!gr || !gr.userData.variants) return;
+    Object.entries(gr.userData.variants).forEach(([sex, obj]) => { obj.visible = sex === state.sex; });
+  });
   document.querySelectorAll("#sex button").forEach(b => b.classList.toggle("on", b.dataset.sex === state.sex));
-  const row = document.querySelector('.row[data-layer="reproductive"] .cnt');
-  if (row) {
-    let n = 0;
-    g.userData.variants[state.sex] && g.userData.variants[state.sex].traverse(o => { if (o.isMesh) n++; });
-    row.textContent = n;
-  }
+  document.querySelectorAll(".row").forEach(row => {
+    const id = row.dataset.layer;
+    const gr = groups[id];
+    if (gr && gr.userData.variants && gr.userData.variants[state.sex]) {
+      let n = 0;
+      gr.userData.variants[state.sex].traverse(o => { if (o.isMesh) n++; });
+      const c = row.querySelector(".cnt");
+      if (c) c.textContent = n;
+    }
+  });
   document.getElementById("foot").textContent =
-    state.sex === "male" ? "reproductive: male — 12 organs from the atlas"
-      : "reproductive: female — modelled (uterus, tubes, ovaries, vulva)";
+    state.sex === "male" ? "male — the atlas body and its 12 reproductive organs"
+      : "female — the tract is modelled; the body surface is still the atlas male";
 }
 
 function fitDistance(w, h) {
@@ -336,6 +347,7 @@ window.__ready = () => pending === 0 && !!bodyBox;
 window.__setMode = (m, pull) => { state.mode = m; if (pull) state.pull = pull; layout(); };
 window.__setSex = s => { state.sex = s; applySex(); };
 window.__toggle = id => toggle(id);
+window.__setSkin = v => { state.skin = !!v; document.getElementById("skinBtn").classList.toggle("on", state.skin); layout(); };
 window.__collapse = () => document.getElementById("collapse").click();
 </script>
 </body>
