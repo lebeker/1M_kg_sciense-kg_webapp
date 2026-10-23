@@ -194,6 +194,9 @@ export default function App() {
   }, [kg])
   const [mode, setMode] = useState<'2d' | '3d'>('2d')
   const [selected, setSelected] = useState<string | null>(null)
+  /** The panel is a view of the selection, not the selection itself: closing it leaves the
+   *  node chosen (and its dimming) until a click lands on empty canvas. */
+  const [panelOpen, setPanelOpen] = useState(true)
   const [query, setQuery] = useState('')
   const [fit, setFit] = useState(0)
   /** Following a connection: which node to put in the middle of the view, and a counter so a
@@ -245,9 +248,15 @@ export default function App() {
     loadDocs().then(setDocs)
   }, [])
 
-  const onSelect = useCallback((id: string | null) => setSelected(id), [])
+  const onSelect = useCallback((id: string | null) => {
+    setSelected(id)
+    // Selecting opens the panel; a click that misses every node is the only thing that clears
+    // the selection. Closing the panel is not a deselection.
+    setPanelOpen(id != null)
+  }, [])
   const onFollow = useCallback((id: string) => {
     setSelected(id)
+    setPanelOpen(true)
     setFocus((prev) => ({ id, n: (prev?.n ?? 0) + 1 }))
   }, [])
 
@@ -919,6 +928,8 @@ export default function App() {
       data-fold-ops={stepList.map((s) => `${s.id}:${s.n}`).join(",")}
       data-hidden={hidden.size}
       data-halos={halosOn ? 'on' : 'off'}
+      data-selected={selected ?? ''}
+      data-panel={panelOpen ? 'open' : 'closed'}
     >
       <header className="bar">
         {/* The documents are not one control among many: beside a graph they are the other half
@@ -1160,7 +1171,7 @@ export default function App() {
             <li
               key={h.id}
               onClick={() => {
-                setSelected(h.id)
+                onFollow(h.id)
                 setQuery('')
               }}
             >
@@ -1182,7 +1193,7 @@ export default function App() {
             selected={selected}
             onSelect={onSelect}
             fitSignal={fit}
-            insetRight={selected ? PANEL_PX : 0}
+            insetRight={selected && panelOpen ? PANEL_PX : 0}
             focus={focus}
             hoverEdge={hoverEdge}
             halos={halos}
@@ -1208,7 +1219,7 @@ export default function App() {
               halos={halos}
               halosOn={halosOn}
               muted={muted}
-              insetRight={selected ? PANEL_PX : 0}
+              insetRight={selected && panelOpen ? PANEL_PX : 0}
               focus={focus}
               hidden={hidden}
               arrows={kg.meta?.visuals?.arrows ?? false}
@@ -1379,9 +1390,9 @@ export default function App() {
         </div>
       )}
 
-      {nodeAttrs && (
+      {nodeAttrs && panelOpen && (
         <aside className="panel">
-          <button className="close" onClick={() => setSelected(null)}>
+          <button className="close" title="close the panel — the node stays selected" onClick={() => setPanelOpen(false)}>
             ×
           </button>
           <h2>{String(nodeAttrs.label ?? selected)}</h2>
