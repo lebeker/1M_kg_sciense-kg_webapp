@@ -3,10 +3,12 @@
 A React viewer for a `kg/1` knowledge-graph document — the web-app half of a
 knowledge-graph skill.
 
-**A worked case:** <https://lebeker.github.io/1M_kg_sciense-kg_webapp/> — one article on the
-neurokinin antagonist class, the document it came from, and the page it renders into. It builds to **one self-contained HTML file** with every
-script and style inlined, so it opens from `file://` with no server, no network
-and no build step on the reader's machine.
+**Two worked cases:** <https://lebeker.github.io/1M_kg_sciense-kg_webapp/> — a drug overview of the
+neurokinin antagonist class (35 nodes), and a field survey of longevity research (1,817 nodes, 110
+categories, 1,563 works), where the graph carries nine documents and the report beside the map is
+readable in the page. Each case shows the document it came from and the page it renders into. It
+builds to **one self-contained HTML file** with every script and style inlined, so it opens from
+`file://` with no server, no network and no build step on the reader's machine.
 
 ## The graph object
 
@@ -75,6 +77,18 @@ The build output keeps that element and that placeholder verbatim. Whatever
 produces the final page replaces the element's text with the `kg/1` JSON and
 changes nothing else. Opening the file with the placeholder still in place shows
 an empty graph and logs no errors.
+
+The documents beside the graph travel the same way, so the page needs no folder:
+
+```html
+<script id="kg-docs" type="application/json">__KG_DOCS__</script>
+```
+
+It is a map of `docs/<file>` → text. When more than one is present the page opens
+them as a folder — a list on the left, the document beside it, a node id in
+backticks selecting that node on the map — and `meta.docs` (written by
+`docs/index.json`) gives each one its title and role. A page with only a single
+note still shows a plain **notes** button.
 
 ## The app's declaration — `app.json`
 
