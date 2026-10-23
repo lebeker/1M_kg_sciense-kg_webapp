@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>sciense-kg · case 1 — an approved-drug overview, built by an agent</title>
-<meta name="description" content="One article about approved neurokinin antagonists, built with the kg skill: the brief, the document, the map it renders.">
+<title>sciense-kg · two cases — a drug overview and a field survey, built by an agent</title>
+<meta name="description" content="Two documents built with the kg skill: an approved-drug overview and a survey of where longevity research is thin. The brief, the document, the map it renders.">
 <style>
 :root{
   --bg:#14161a; --fg:#e6e8ec; --muted:#8b93a1; --line:#2a2e36;
@@ -48,6 +48,9 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
 .note{border-top:1px solid var(--line);margin-top:56px;padding-top:18px;
   color:var(--muted);font-size:13px}
 .ok{color:var(--good)} .gap{color:var(--warn)}
+hr.sep{border:0;border-top:1px solid var(--line);margin:64px 0 44px}
+img.shot{display:block;width:100%;border:0}
+.note b{color:var(--fg)}
 ul.tight{margin:6px 0 0;padding-left:18px;color:var(--text-2)}
 ul.tight li{margin:4px 0}
 </style>
@@ -148,8 +151,78 @@ need to write an overview article for "Lynkuet"
         declared by hand on a fresh graph.</li>
   </ul>
 
+
+  <hr class="sep">
+
+  <div class="kicker">sciense-kg · case 2 · a field survey</div>
+  <h1>Longevity research — where the work sits, and where the money doesn't</h1>
+  <p class="lede">The same skill, asked a different question: not "who is this drug", but "which
+  parts of this field are structurally thin, and does the money sit where the work is". The answer
+  is a category map of 110 shelves over 1,563 works — and a report whose every claim links to a
+  node you can open.</p>
+
+  <div class="grid" style="margin-top:20px">
+    <div class="stat"><b>1,817</b><span>nodes</span></div>
+    <div class="stat"><b>3,979</b><span>edges</span></div>
+    <div class="stat"><b>110</b><span>categories</span></div>
+    <div class="stat"><b>1,563</b><span>works</span></div>
+    <div class="stat"><b>71</b><span>researchers</span></div>
+    <div class="stat"><b>17</b><span>companies</span></div>
+    <div class="stat"><b>9</b><span>documents</span></div>
+  </div>
+
+  <h2>The map</h2>
+  <div class="frame"><img class="shot" src="catmap/shot-map.jpg"
+    alt="The longevity category map: 1,817 nodes arranged by ring, categories on the outer ring, publications inside, 3,979 relations"></div>
+  <div class="bar">
+    <a class="btn primary" href="catmap/index.html">open the map</a>
+    <a class="btn" href="catmap/report.md">read the report (.md)</a>
+    <a class="btn" href="catmap/prompt.md">the brief and its queries</a>
+    <a class="btn" href="catmap/graph.json" download>download kg.json</a>
+  </div>
+
+  <h2>The report, on the page</h2>
+  <div class="frame"><img class="shot" src="catmap/shot.jpg"
+    alt="The report open inside the page: the folder of nine documents on the left, the report beside it, the map on the right"></div>
+  <p class="muted" style="font-size:13px">Nine documents travel inside the file: the report, how to
+  read the map, the method, every source and its cost, what was rejected, the outside frame the
+  shelves were measured against, and the coverage diff. The report is the <code>.md</code> above;
+  the page renders it with a node id in every paragraph — click one and the map selects it.</p>
+
+  <h2>What it found</h2>
+  <table>
+    <thead><tr><th>finding</th><th class="num">number</th></tr></thead>
+    <tbody>
+      <tr><td>the field is intervention-shaped, and lifestyle is the intervention</td>
+          <td class="num">56% of attention · diet + sleep + exercise = 48%</td></tr>
+      <tr><td>the molecular geroprotectors are a rounding error beside it</td>
+          <td class="num">rapamycin 900 + NAD⁺ 1,500 = 0.9%</td></tr>
+      <tr><td>mechanisms are the most cited and the least renewed</td>
+          <td class="num">median 210 cites · 7% since 2024</td></tr>
+      <tr><td>money and companies sit on different shelves</td>
+          <td class="num">translation: 1.4% of awards, 7 of 17 companies</td></tr>
+      <tr><td>the tail is where nobody publishes</td>
+          <td class="num">31 of 78 shelves under 500 works, 10 at zero</td></tr>
+    </tbody>
+  </table>
+
+  <h2>What is checked, and what is priced</h2>
+  <ul class="tight">
+    <li><span class="ok">checked</span> — every paragraph of the report carries a node id: 52
+        references, all of them resolving to a node that opens when clicked.</li>
+    <li><span class="ok">checked</span> — the shelves were measured against an outside frame (the
+        twelve hallmarks of aging): <b>0 of 12</b> at shelf level, <b>7</b> buried as classes,
+        <b>5</b> absent. That is a finding about the shelving, stated as one.</li>
+    <li><span class="gap">priced</span> — four places the evidence is thinner than the claims, each
+        with the source that closes it, its cost and what it would move: the money is apportioned
+        rather than read from awards, eleven of seventeen companies have no paper here, attention
+        counts title vocabulary, and each shelf was searched once. Three of the four fixes are
+        free.</li>
+  </ul>
+
   <div class="note">
-    Built by an agent in one session, 20–21 October 2026 · rendered with
+    Case 1 built by an agent in one session, 20–21 October 2026; case 2 in one session on
+    21–23 October 2026 · rendered with
     <code>viewer-v0.0.54</code> · skill <code>6a27d11</code> ·
     <a href="https://github.com/lebeker/1M_kg_sciense-kg_webapp">the app</a> ·
     <a href="https://github.com/lebeker/1M_kg_skill">the skill</a>
