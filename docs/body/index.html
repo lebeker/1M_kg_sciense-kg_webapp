@@ -128,6 +128,13 @@ function paint(l, root, tag) {
     if (!o.isMesh) return;
     n++;
     const keep = (l.id === "organs" || l.id === "reproductive") && o.material && o.material.color;
+    if (l.id === "reproductive" && o.material && o.material.map) {
+      o.material.roughness = 0.55;
+      o.material.metalness = 0.0;
+      o.material.side = THREE.DoubleSide;
+      o.material.color.setScalar(0.72);   // the lights clip this small surface otherwise
+      return;
+    }
     const base = keep ? o.material.color.clone()
       : l.id === "muscles" ? new THREE.Color(0x9e3b38)
       : (o.material && o.material.color ? o.material.color.clone().lerp(c, 0.5) : c);
@@ -246,7 +253,7 @@ function applySex() {
   }
   document.getElementById("foot").textContent =
     state.sex === "male" ? "reproductive: male — 12 organs from the atlas"
-      : "reproductive: female — 8 organs, modelled (the atlas has none)";
+      : "reproductive: female — modelled (uterus, tubes, ovaries, vulva)";
 }
 
 function fitDistance(w, h) {
