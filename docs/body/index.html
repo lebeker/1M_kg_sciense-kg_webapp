@@ -78,7 +78,7 @@
 <script src="lib/OrbitControls.js"></script>
 <script>
 const LAYERS = [
-  { id:"skin",     name:"skin · teeth · hair · nails", color:0xe8c9a0, files:["skin","skinbits"] },
+  { id:"skin",     name:"skin · teeth · hair · nails", color:0xe8c9a0, filesBySex:true },
   { id:"muscles",  name:"muscles",                     color:0xc0554f },
   { id:"bones",    name:"bones",                       color:0xd9d2bd },
   { id:"cardio",   name:"cardio-vascular",             color:0xb33a3a },
@@ -126,6 +126,7 @@ function paint(l, root, tag) {
   let n = 0;
   root.traverse(o => {
     if (!o.isMesh) return;
+    if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals();
     n++;
     const keep = (l.id === "organs" || l.id === "reproductive") && o.material && o.material.color;
     if (l.id === "reproductive" && o.material && o.material.map) {
@@ -152,7 +153,12 @@ function paint(l, root, tag) {
 
 const loader = new THREE.GLTFLoader();
 
+const loadedFiles = new Set();
+
 function loadFile(id, file, variant) {
+  const key = id + "/" + file + "/" + (variant || "");
+  if (loadedFiles.has(key)) return Promise.resolve();
+  loadedFiles.add(key);
   return new Promise(res => {
     pending++;
     loader.load(`models/${file}.glb`, gltf => {
@@ -171,6 +177,10 @@ function loadFile(id, file, variant) {
 }
 
 async function boot() {
+  // a second boot must not stack duplicate meshes on the first
+  Object.keys(groups).forEach(k => { if (groups[k].parent) groups[k].parent.remove(groups[k]); delete groups[k]; delete targets[k]; });
+  Object.keys(counts).forEach(k => delete counts[k]);
+  loadedFiles.clear();
   const jobs = [];
   LAYERS.forEach(l => {
     if (l.filesBySex) return;
@@ -249,7 +259,11 @@ function applySex() {
   if (!g) return;
   Object.values(groups).forEach(gr => {
     if (!gr || !gr.userData.variants) return;
-    Object.entries(gr.userData.variants).forEach(([sex, obj]) => { obj.visible = sex === state.sex; });
+    Object.entries(gr.userData.variants).forEach(([sex, obj]) => {
+      const on = sex === state.sex;
+      obj.visible = on;
+      obj.traverse(o => { o.visible = on; });
+    });
   });
   document.querySelectorAll("#sex button").forEach(b => b.classList.toggle("on", b.dataset.sex === state.sex));
   document.querySelectorAll(".row").forEach(row => {
@@ -264,7 +278,7 @@ function applySex() {
   });
   document.getElementById("foot").textContent =
     state.sex === "male" ? "male — the atlas body and its 12 reproductive organs"
-      : "female — the tract is modelled; the body surface is still the atlas male";
+      : "female — modelled tract, and a CC0 female surface (a different scan, so it does not wrap this skeleton)";
 }
 
 function fitDistance(w, h) {
