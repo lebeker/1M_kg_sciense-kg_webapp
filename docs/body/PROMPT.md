@@ -1,104 +1,95 @@
-# PROMPT — schematic body map with organ constellations
+# PROMPT — a designed 3D body map with organ constellations
 
-Copy everything below the line into the other model. It assumes the model has shell access to the
-repo and can run a browser for verification.
+Hand everything below the rule to the other model. It has shell access and a browser; it is
+expected to model, render, look at its own screenshots and iterate. Judge it on the pictures.
 
 ---
 
 You are working in `~/Work/other/1M_kg_health_webapp` — a copy of the science-kg viewer plus a
-standalone static three.js page at `body/index.html`. Read `HISTORY.md` and `body/README.md` first:
-they record every asset we pulled in and every attempt that failed, so you do not repeat them.
+standalone three.js page at `body/index.html`. Read `HISTORY.md` and `body/README.md` first: they
+list every asset we pulled in and every attempt that failed, so you don't repeat them.
 
-## What this product is
+## The product
 
-A **personal health map**, not an anatomy atlas. The 3D body is a schematic map whose only job is
-to help a user or a specialist *find the weak point fast*: a cardiologist opens the map, sees that
-the ophthalmologist already marked retinopathy on the eye node, and follows it. Detail belongs in
-the graph, not in the mesh.
+A personal health map. The body is the *map*, the graph is the *database*. A specialist opens it
+and finds the weak point fast — a cardiologist sees that the ophthalmologist already marked
+retinopathy on the eye, and follows the thread. Detail lives in the graph; the body is how you
+navigate it.
 
-Three consequences, in order of importance:
+## The bar
 
-1. **The body is cartoonish and schematic.** An androgynous figure with smooth, simple shapes and
-   flat colour. No realistic skin, no muscles with fibre detail, no anatomical texturing. Readable
-   at a glance, cheap to render, and it must not pretend to be a medical model.
-2. **Organs are blobs.** Each organ is a simple shape at a plausible place, not an anatomically
-   accurate mesh. A blob is enough to click.
-3. **Clicking an organ opens a constellation.** The blob is a doorway: it opens a local graph of
-   that organ's nodes — the organ itself, its parts, conditions, analyses, protocols — laid out as
-   a constellation where each node carries a small, recognisable silhouette of what it represents.
-   Position inside the constellation has **no anatomical meaning**; the edges carry the meaning.
+This is a **designed 3D illustration**, not a diagram. It will be judged on screenshots at
+1280×800, at 100% zoom, next to the science-kg case. A stickman, a mannequin of spheres, or
+anything that reads as a placeholder is a failed delivery. The body must look intentional: clean
+forms, a consistent palette, soft studio lighting, a silhouette you would put on a landing page.
+Stylised is fine — cheap is not.
 
-The graph is the database. Users add their own nodes (a diagnosis, an analysis, a protocol, a
-medication) and edges; the map is how they browse it. Scans and documents are assets stored beside
-the graph, never inside it.
+Organs are **modelled and recognisable**, moderately detailed, each its own mesh: a heart with
+atria, ventricles and aortic arch; a bean-shaped kidney with a ureter; a lobed liver; lungs with
+lobes; a curved stomach; a coiled intestine. Not spheres.
 
-## What exists today
+Clicking an organ opens its **constellation**: a local graph where every node carries a small 3D
+organ or object — reusing the same meshes, scaled down — never an SVG icon.
 
-- `body/index.html` — a static page, three.js r146, no build step. Left legend with per-layer eye
-  toggles, a sex switch, three view modes (one body / one layer out / all apart), GLB layers loaded
-  from `body/models/`.
-- `body/models/` — `bones`, `muscles`, `cardio`, `nervous`, `lymphoid`, `organs` (104 separate
-  organs, coloured), `skin`, `skinbits`, `reproductive-male`, `reproductive-female`, `skin-female`.
-  All exported from Z-Anatomy (models CC BY-SA 4.0) plus one CC0 body scan. They are **reference**,
-  not the target style.
-- The graph contract (unchanged from science-kg): a `kg/1` JSON with nodes (`id`, `type`, `label`,
-  `level`, `weight`, `props`) and edges (`from`, `to`, `kind`, `power`), embedded in the page as
-  `<script id="kg-graph" type="application/json">__KG_GRAPH__</script>`; documents as
-  `<script id="kg-docs" type="application/json">__KG_DOCS__</script>`.
-- `src/` — the React + Vite app (sigma for 2D, three for 3D). Do not break it.
+## What exists
 
-## Build this
+- `body/index.html` — static page, three.js r146, no build step. Legend with per-layer eye toggles,
+  a sex switch, three view modes (one body / one layer out / all apart), GLB layers from
+  `body/models/`.
+- `body/models/` — Z-Anatomy-derived layers (bones, muscles, cardio, nervous, lymphoid, organs with
+  104 separate organs) plus a CC0 female surface. **Reference material, not the target style** —
+  use them for shape, proportion and topology; restyle, retopologise, decimate, re-material them.
+  Do not ship them as they are.
+- The graph contract, unchanged from science-kg: `kg/1` JSON with nodes (`id`, `type`, `label`,
+  `level`, `weight`, `props`) and edges (`from`, `to`, `kind`, `power`), embedded as
+  `<script id="kg-graph" type="application/json">__KG_GRAPH__</script>`, documents as
+  `<script id="kg-docs" ...>`. `src/` is the React app — don't break it.
 
-**1. Schematic body.** Replace the realistic shells with a stylised androgynous figure built from
-simple geometry (capsules, spheres, rounded boxes — either generated in three.js or exported once
-as a small GLB). Layer groups stay the same (bones, muscles, organs, cardio, nervous, lymphoid,
-skin) but every layer is flat-shaded, low-poly and clearly diagrammatic. Keep the existing legend,
-eye toggles and three view modes. The sex switch stays as a `meta.props`-driven control, but the
-figure itself is androgynous — the switch changes the reproductive layer only.
+## Build
 
-**2. Organ blobs.** One blob per organ, each a separate mesh (so each can be a graph node), placed
-plausibly, coloured by system, with hover and selection states. Organs that belong to a system
-still live in that layer; clicking any organ selects it.
+1. **The figure.** A stylised, androgynous human body with separable layers (skin, muscles, bones,
+   circulatory, nervous, lymphatic, organs). Author it properly — Blender is installed at
+   `~/Applications/Blender.app`; MakeHuman/MPFB2 and the CC0 scan in `HISTORY.md` are legitimate
+   bases to retopo and restyle, and Z-Anatomy's skeleton is the reference for proportion. Same
+   height and framing as now; keep the legend, eye toggles, three modes and the sex prop.
 
-**3. The constellation.** Clicking an organ opens a canvas overlay or side panel showing that
-organ's local graph: the organ node at the centre, its parts/conditions/analyses radiating out,
-edges labelled by kind (`has-part`, `sign-of`, `measured-by`, `treated-by`, `risk-from`). Every
-node carries a small silhouette (SVG is fine) of what it represents — a kidney node looks like a
-kidney, a blood test looks like a vial. Layout is force-directed or radial; **it does not encode
-anatomy**. Clicking a node in the constellation opens its details, and nodes of type `condition`
-or `analysis` can be attached to other organs — that is how a specialist leaves a mark for the
-next one.
+2. **The organs.** Each organ a separate mesh, positioned plausibly, coloured by system, with
+   hover/selection states and a badge carrying its node count. Derive shapes from the atlas organs
+   (decimate, smooth, restyle) rather than blocking them out of primitives.
 
-**4. The graph as a database.** Add a minimal editor: create a node (type, label, optional props),
-connect it to an existing node, delete what you created. Persist to `localStorage` for now behind a
-single module (`body/store.js`) whose interface is async and shaped like a future API
-(`listNodes`, `addNode`, `addEdge`, `removeNode`), so a server can replace it later without touching
-the UI. Every organ blob reads its id from the graph; no hard-coded organ names in the viewer beyond
-the fixture.
+3. **The constellation.** On click, open a view where the organ sits at the centre and its parts,
+   conditions, analyses and protocols radiate out; each node shows a miniature 3D object (same
+   meshes, instanced and scaled, or small dedicated GLBs). Edges are labelled by kind (`has-part`,
+   `sign-of`, `measured-by`, `treated-by`, `risk-from`). Layout is radial or force-directed — it
+   carries no anatomical meaning. Nodes open a detail panel; a condition or analysis can be
+   attached to any organ, which is how one specialist leaves a mark for the next.
 
-**5. Ship a fixture.** Author a small `kg/1` graph for one region — heart and its neighbourhood:
-heart, its chambers and valves, hypertension, ECG, echocardiogram, beta-blocker, cardiologist — so
-the constellation has something real to show. Keep it in `body/fixture.json`, loaded when no
-`kg-graph` script is present.
+4. **The store.** A minimal editor — create node, connect, delete — persisted to `localStorage`
+   behind one async module (`body/store.js`) shaped like a future API (`listNodes`, `addNode`,
+   `addEdge`, `removeNode`). Organ blobs read their ids from the graph.
+
+5. **Fixture.** A small `kg/1` graph for the heart's neighbourhood — heart, chambers, valves,
+   hypertension, ECG, echocardiogram, beta-blocker, cardiologist — loaded when no `kg-graph` script
+   is present, so the constellation has something real to show.
 
 ## Acceptance
 
-- Opening `body/index.html` (over `http://`, any static server) shows the schematic androgynous
-  body with all layers, legend, eye toggles and the three view modes, and no realistic meshes.
-- Clicking the heart blob opens a constellation with at least six nodes and labelled edges; every
-  node has a silhouette; clicking one opens its details.
-- Adding a node, connecting it and reloading keeps it (localStorage), and the organ blob reflects
-  the new count on its badge.
-- No console errors; 60 fps at 1280×800 with all layers visible; page weight under 6MB.
-- `README.md` in `body/` documents the store interface, the fixture format and the layer naming.
+- Three screenshots, at 1280×800: the whole body, one layer pulled out, and the heart's
+  constellation open. They must look like a designed product, not a prototype — clean silhouette,
+  coherent palette, soft light, no primitive seams, no placeholder shapes.
+- Every organ is individually clickable; the heart's constellation shows at least eight nodes with
+  labelled edges and miniatures; a node opens its details.
+- Add a node, connect it, reload — it persists; the organ badge increments.
+- 60 fps at 1280×800 with all layers visible; page weight under 8MB; no console errors.
+- `body/README.md` documents the art direction, the store interface and the fixture format.
 
 ## Constraints
 
-- No servers, no build step for `body/` — it is a static page plus ES modules.
-- Do not deform the existing realistic meshes to make them schematic; build the schematic shapes
-  separately and leave the anatomy GLBs untouched as reference.
-- Z-Anatomy models are CC BY-SA 4.0: if any of their geometry survives in the product, the
-  attribution and share-alike note stays in `body/README.md`.
-- Do not chase realism, anatomical placement accuracy, or clinical correctness. If a choice is
-  between "looks more medical" and "reads faster", pick reads faster.
-- Commit once at the end with a message that says what changed; do not commit per file.
+- No servers or build step for `body/` — static page plus ES modules.
+- Z-Anatomy geometry is CC BY-SA 4.0: attribution and share-alike stay in `body/README.md` if any
+  of it survives. The CC0 scan and MakeHuman output carry no such obligation.
+- Do not chase photoreal or clinical accuracy — chase a beautiful, readable map. But "stylised" is
+  a design decision, not an excuse for crude geometry.
+- Iterate on screenshots at least twice before you call it done; the first pass is never the
+  delivery.
+- Commit once at the end; do not commit per file.
